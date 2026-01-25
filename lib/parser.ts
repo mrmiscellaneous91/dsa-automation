@@ -36,12 +36,14 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     GUIDELINES:
     1. The STUDENT is NOT the person who sent the email (e.g., Nicola from Remtek).
     2. The STUDENT name is often in ALL CAPS (like CADI HAF MURPHY or AYDIL GANIDAGLI).
-    3. The PO Number is usually a 7-digit number starting with 5 (e.g., 5078726). Look in the PDF if attached.
+    3. The PO Number is usually a 7-digit number starting with 5. IT IS ALMOST CERTAINLY IN THE ATTACHED PDF.
     4. LICENSE YEARS: Be extremely precise. 
        - If you see "3 year" or "three year", licenseYears is 3. 
        - If you see "1 year" or "one year", licenseYears is 1.
-       - DEFAULT is 1, but check the text carefully for '3'.
+       - CHECK THE PDF CAREFULLY. If the email implies a renewal or 3 years, trust that over a default.
     5. The STUDENT email is usually an outlook, icloud, or university address.
+    
+    CRITICAL: The PDF attachment contains the most accurate data. TRUST THE PDF over the email body if they conflict.
 
     EMAIL CONTENT:
     ${emailBody}
@@ -65,16 +67,21 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
             // Add attachment if present (Native Gemini PDF support)
             if (attachmentBase64 && mimeType) {
+                console.log(`[Parser] Attaching PDF (${attachmentBase64.length} chars) to Gemini request`)
                 parts.push({
                     inlineData: {
                         data: attachmentBase64,
                         mimeType: mimeType
                     }
                 })
+            } else {
+                console.log("[Parser] No PDF attachment found/passed")
             }
 
             const result = await model.generateContent(parts)
             const text = result.response.text()
+            console.log("[Parser] Gemini Raw Response:", text)
+
             const jsonStart = text.indexOf("{")
             const jsonEnd = text.lastIndexOf("}") + 1
 
@@ -84,10 +91,11 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
                 return parsed
             } else {
+                console.error("No valid JSON found in AI response")
                 throw new Error("No valid JSON found in AI response")
             }
         } catch (error) {
-            console.error("Gemini Error:", error)
+            console.error("Gemini Parsing Error:", error)
         }
     }
 
