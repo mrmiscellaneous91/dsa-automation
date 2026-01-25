@@ -36,17 +36,18 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     EMAIL SUBJECT: ${subject}
 
     GUIDELINES:
-    1. The STUDENT is NOT the person who sent the email (e.g., Nicola from Remtek).
-    2. The STUDENT name is often in ALL CAPS (like CADI HAF MURPHY or AYDIL GANIDAGLI).
-    3. The PO Number is usually a 7-digit number starting with 5. It might be labeled as "Purchase Order", "PO", "Order Ref", "Order Number".
-    4. LICENSE YEARS: Be extremely precise. 
+    1. STUDENT NAME: Look for this PRIMARILY in the EMAIL BODY. It is often in ALL CAPS (e.g. "CADI HAF MURPHY") near the student email.
+       - Do NOT use the string "[PDF ATTACHMENT CONTENT]" as a name.
+       - Do NOT use the Provider's name (e.g., Nicola, Paul).
+    2. STUDENT EMAIL: Look for this PRIMARILY in the EMAIL BODY. (e.g. outlook, hotmail, gmail, university address).
+    3. PO NUMBER: Look for this PRIMARILY in the [PDF ATTACHMENT CONTENT] section. It is usually a 7-digit number starting with 5 (e.g., 5078726, 90384).
+    4. LICENSE YEARS: Check BOTH the Email Body and PDF. 
        - If you see "3 year" or "three year", licenseYears is 3. 
-       - If you see "1 year" or "one year", licenseYears is 1.
-       - CHECK THE PDF CONTENT SECTION CAREFULLY. If the email implies a renewal or 3 years, trust that over a default.
-       - DEFAULT is 1, but check the text carefully for '3'.
-    5. The STUDENT email is usually an outlook, icloud, or university address.
-    
-    CRITICAL: The email body might contain appended PDF content labeled [PDF ATTACHMENT CONTENT]. TRUST THIS DATA above all else.
+       - Default is 1, but look carefully for "3" or "renewal".
+
+    CRITICAL: The email body has extra text appended labeled "[PDF ATTACHMENT CONTENT]". 
+    - Use the EMAIL BODY section for Name and Email.
+    - Use the PDF SECTION for PO Number and detailed order info.
 
     EMAIL CONTENT:
     ${emailBody}
