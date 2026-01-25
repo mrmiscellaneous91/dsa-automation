@@ -11,8 +11,8 @@ export async function GET() {
 
     const gmail = getGmailClient((session as any).accessToken as string)
 
-    // Targeted query for license requests
-    const query = `is:unread (Remtek OR Invate OR Assistive OR "Barry Bennett") "Audemic"`
+    // Targeted query for specific provider domains
+    const query = `is:unread (from:barrybennett.co.uk OR from:as-dsa.com OR from:unleashedsoftware.com OR from:remtek-online.co.uk OR from:invate.co.uk) "Audemic"`
 
     const messages = await listEmails(gmail, query)
     const tasks = []

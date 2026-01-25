@@ -20,10 +20,10 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     const senderLower = senderEmail.toLowerCase()
     let identifiedProvider: ParsedRequest['provider'] = "Unknown"
 
-    if (senderLower.includes("barrybennett")) identifiedProvider = "Barry Bennett"
-    else if (senderLower.includes("remtek")) identifiedProvider = "Remtek"
-    else if (senderLower.includes("invate")) identifiedProvider = "Invate"
-    else if (senderLower.includes("assistive")) identifiedProvider = "Assistive"
+    if (senderLower.includes("barrybennett.co.uk")) identifiedProvider = "Barry Bennett"
+    else if (senderLower.includes("remtek-online.co.uk")) identifiedProvider = "Remtek"
+    else if (senderLower.includes("invate.co.uk")) identifiedProvider = "Invate"
+    else if (senderLower.includes("as-dsa.com") || senderLower.includes("unleashedsoftware.com")) identifiedProvider = "Assistive"
 
     const prompt = `
     You are an expert data extractor for Audemic. 
