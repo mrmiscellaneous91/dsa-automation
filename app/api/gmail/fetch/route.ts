@@ -11,30 +11,34 @@ export async function GET() {
 
     const gmail = getGmailClient((session as any).accessToken as string)
 
-    // Query to find emails from providers
-    const providers = ["Remtek", "Invate", "Assistive", "Barry Bennett"]
-    const query = `is:unread (${providers.join(" OR ")})`
+    // Broad query to find ANY license requests
+    const query = `is:unread (Remtek OR Invate OR Assistive OR "Barry Bennett" OR "Audemic licence")`
 
     const messages = await listEmails(gmail, query)
     const tasks = []
 
     for (const message of messages) {
-        const fullEmail = await getEmail(gmail, message.id!)
-        const subject = fullEmail.payload?.headers?.find((h: any) => h.name === "Subject")?.value || ""
-        const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
-        const body = extractEmailContent(fullEmail.payload)
+        try {
+            const fullEmail = await getEmail(gmail, message.id!)
+            const subject = fullEmail.payload?.headers?.find((h: any) => h.name === "Subject")?.value || ""
+            const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
+            const body = extractEmailContent(fullEmail.payload)
 
-        const parsedData = await parseEmailWithAI(body, subject, from)
+            // Pass more context to AI
+            const parsedData = await parseEmailWithAI(body, subject, from)
 
-        tasks.push({
-            id: message.id,
-            threadId: message.threadId,
-            subject,
-            from,
-            body,
-            parsedData,
-            status: "NEW"
-        })
+            tasks.push({
+                id: message.id,
+                threadId: message.threadId,
+                subject,
+                from,
+                body,
+                parsedData,
+                status: "NEW"
+            })
+        } catch (err) {
+            console.error(`Error processing message ${message.id}:`, err)
+        }
     }
 
     return NextResponse.json({ tasks })

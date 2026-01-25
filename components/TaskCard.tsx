@@ -157,8 +157,8 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                                 {step > 2 ? "✓" : "2"}
                             </div>
                             <div>
-                                <p className="font-semibold text-gray-900">Create Subscription</p>
-                                <p className="text-xs text-gray-500">Opens admin & copies user details</p>
+                                <p className="font-semibold text-gray-900">Automated Provisioning</p>
+                                <p className="text-xs text-gray-500">Bot logs in & creates subscription automatically</p>
                             </div>
                         </div>
                         {step === 2 && (
