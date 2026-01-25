@@ -64,10 +64,15 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
             const text = result.response.text()
             const jsonStart = text.indexOf("{")
             const jsonEnd = text.lastIndexOf("}") + 1
-            const jsonStr = text.substring(jsonStart, jsonEnd)
-            const parsed = JSON.parse(jsonStr)
-            if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
-            return parsed
+
+            if (jsonStart !== -1 && jsonEnd > jsonStart) {
+                const jsonStr = text.substring(jsonStart, jsonEnd)
+                const parsed = JSON.parse(jsonStr)
+                if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
+                return parsed
+            } else {
+                throw new Error("No valid JSON found in AI response")
+            }
         } catch (error) {
             console.error("Gemini Error:", error)
         }
