@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     ]
 
     try {
-        await appendToSheet(sheets, spreadsheetId, "Sheet1!A2", [row])
+        await appendToSheet(sheets, spreadsheetId, "Master!A:A", [row])
         return NextResponse.json({ success: true })
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 })
