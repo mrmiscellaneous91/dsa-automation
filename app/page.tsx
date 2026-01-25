@@ -15,6 +15,10 @@ export default function Home() {
     setError("")
     try {
       const res = await fetch("/api/gmail/fetch")
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`Server Error (${res.status}): ${text || res.statusText}`)
+      }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setTasks(data.tasks)
