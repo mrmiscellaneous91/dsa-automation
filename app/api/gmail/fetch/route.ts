@@ -52,13 +52,21 @@ export async function GET() {
 
                 // Append PDF text to body if found, to give Claude full context
                 if (pdfText) {
+                    console.log(`[Fetch] PDF text extracted successfully (${pdfText.length} chars). Appending to body.`)
                     body += pdfText
+                } else {
+                    console.log("[Fetch] No PDF text extracted from this email.")
                 }
 
+                console.log("[Fetch] Sending to AI parser. Body length:", body.length)
                 const parsedData = await parseEmailWithAI(body, subject, from)
+                console.log("[Fetch] AI Parser Result:", JSON.stringify(parsedData, null, 2))
 
                 // Skip if missing student email or if we already have this request
-                if (!parsedData.userEmail) continue;
+                if (!parsedData.userEmail) {
+                    console.log("[Fetch] Skipping: No student email found in parsed data.")
+                    continue
+                }
 
                 const uniqueKey = `${parsedData.userEmail.toLowerCase()}-${parsedData.poNumber || 'nopo'}`
 
