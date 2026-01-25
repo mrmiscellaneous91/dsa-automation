@@ -88,12 +88,14 @@ function fallbackParse(body: string, subject: string, senderEmail: string, provi
     const studentEmail = emails.find(e => e.toLowerCase() !== senderAddress.toLowerCase()) || emails[0] || ""
     const nameMatch = body.match(/[A-Z]{2,}\s[A-Z]{2,}(\s[A-Z]{2,})?/)
 
+    const bodyLower = body.toLowerCase()
+
     return {
         provider,
         providerContact: "Team",
         userName: nameMatch ? nameMatch[0] : "Unknown User",
         userEmail: studentEmail,
-        licenseYears: body.includes("2 year") ? 2 : body.includes("3 year") ? 3 : body.includes("4 year") ? 4 : 1,
+        licenseYears: bodyLower.includes("3 year") ? 3 : bodyLower.includes("2 year") ? 2 : bodyLower.includes("4 year") ? 4 : 1,
         poNumber: body.match(/PO\d+|[0-9]{5,}/)?.[0] || "",
     }
 }

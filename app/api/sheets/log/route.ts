@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     // 1. Get the actual sheet name dynamically to avoid "Unable to parse range"
     const meta = await sheets.spreadsheets.get({ spreadsheetId })
     const sheetName = meta.data.sheets?.[0]?.properties?.title || "Sheet1"
-    const range = `${sheetName}!A:A`
+    const range = `'${sheetName}'!A:A`
 
     const row = [
         "true",           // A: agent_added
