@@ -27,31 +27,30 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
     const prompt = `
     You are an expert data extractor for Audemic. 
-    You receive emails from student equipment providers regarding license assignments.
+    IMPORTANT: You are looking for a STUDENT'S license details in an email from an equipment PROVIDER.
 
-    PROVIDER: ${identifiedProvider} (Verified from sender email)
-    SENDER: ${senderEmail}
-    SUBJECT: ${subject}
+    PROVIDER: ${identifiedProvider}
+    SENDER EMAIL: ${senderEmail}
+    EMAIL SUBJECT: ${subject}
 
-    GOAL: Extract the STUDENT'S details for a new Audemic license.
-    
-    CRITICAL RULES:
-    1. The SENDER (the person who sent the email) is NOT the student.
-    2. The STUDENT name is the person getting the license (usually written in ALL CAPS).
-    3. The STUDENT name is usually mentioned after phrases like "assign the following student" or "student name:".
-    4. Provide the result in VALID JSON.
+    GUIDELINES:
+    1. The STUDENT is NOT the person who sent the email (e.g., Nicola from Remtek).
+    2. The STUDENT name is often in ALL CAPS (like CADI HAF MURPHY or AYDIL GANIDAGLI).
+    3. The PO Number is usually a 7-digit number (like 5078726) or starts with "PO".
+    4. License years are 1, 2, 3, or 4. Look for "X year licence".
+    5. The STUDENT email is usually an outlook, icloud, or university address.
 
-    EMAIL BODY:
+    EMAIL CONTENT:
     ${emailBody}
 
     Return JSON:
     {
       "provider": "${identifiedProvider}",
-      "providerContact": "Name from signature",
-      "userName": "Student Full Name",
-      "userEmail": "Student Email Address",
-      "licenseYears": 1,
-      "poNumber": "PO12345"
+      "providerContact": "Sender First Name",
+      "userName": "STUDENT FULL NAME",
+      "userEmail": "Student Email",
+      "licenseYears": 3,
+      "poNumber": "7-digit PO"
     }
   `
 
@@ -64,10 +63,10 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
             const jsonEnd = text.lastIndexOf("}") + 1
             const jsonStr = text.substring(jsonStart, jsonEnd)
             const parsed = JSON.parse(jsonStr)
-            if (parsed.provider === "Unknown" || !parsed.provider) parsed.provider = identifiedProvider
+            if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
             return parsed
         } catch (error) {
-            console.error("Gemini Parsing Error:", error)
+            console.error("Gemini Error:", error)
         }
     }
 

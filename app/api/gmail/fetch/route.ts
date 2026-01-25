@@ -11,11 +11,12 @@ export async function GET() {
 
     const gmail = getGmailClient((session as any).accessToken as string)
 
-    // Broad query to find ANY license requests
-    const query = `is:unread (Remtek OR Invate OR Assistive OR "Barry Bennett" OR "Audemic licence")`
+    // Targeted query for license requests
+    const query = `is:unread (Remtek OR Invate OR Assistive OR "Barry Bennett") "Audemic"`
 
     const messages = await listEmails(gmail, query)
     const tasks = []
+    const seenRequests = new Set<string>()
 
     for (const message of messages) {
         try {
@@ -24,18 +25,25 @@ export async function GET() {
             const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
             const body = extractEmailContent(fullEmail.payload)
 
-            // Pass more context to AI
             const parsedData = await parseEmailWithAI(body, subject, from)
 
-            tasks.push({
-                id: message.id,
-                threadId: message.threadId,
-                subject,
-                from,
-                body,
-                parsedData,
-                status: "NEW"
-            })
+            // Skip if missing student email or if we already have this request
+            if (!parsedData.userEmail) continue;
+
+            const uniqueKey = `${parsedData.userEmail.toLowerCase()}-${parsedData.poNumber || 'nopo'}`
+
+            if (!seenRequests.has(uniqueKey)) {
+                seenRequests.add(uniqueKey)
+                tasks.push({
+                    id: message.id,
+                    threadId: message.threadId,
+                    subject,
+                    from,
+                    body,
+                    parsedData,
+                    status: "NEW"
+                })
+            }
         } catch (err) {
             console.error(`Error processing message ${message.id}:`, err)
         }
