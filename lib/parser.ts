@@ -61,7 +61,8 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
     if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "dummy") {
         try {
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
+            // Using gemini-1.5-flash as it is more stable and widely available than pro for this API version
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
             const parts: any[] = [{ text: promptText }]
 
