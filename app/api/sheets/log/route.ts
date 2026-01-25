@@ -29,10 +29,8 @@ export async function POST(req: Request) {
     const amounts: Record<number, string> = { 1: "106.92", 2: "208.44", 3: "309.96", 4: "411.48" }
     const amount = amounts[Number(data.licenseYears)] || "106.92"
 
-    // 1. Get the actual sheet name dynamically to avoid "Unable to parse range"
-    const meta = await sheets.spreadsheets.get({ spreadsheetId })
-    const sheetName = meta.data.sheets?.[0]?.properties?.title || "Sheet1"
-    const range = `'${sheetName}'!A:A`
+    // Write directly to the specific tab requested by user
+    const range = "'Updated_Licence_Table'!A:A"
 
     const row = [
         "true",           // A: agent_added
