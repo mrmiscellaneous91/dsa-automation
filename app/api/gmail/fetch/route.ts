@@ -36,7 +36,8 @@ export async function GET() {
                             try {
                                 const attachment = await getAttachment(gmail, message.id!, part.body.attachmentId)
                                 if (attachment.data) {
-                                    pdfBase64 = attachment.data
+                                    // Convert from Base64URL to Standard Base64 for Gemini
+                                    pdfBase64 = attachment.data.replace(/-/g, '+').replace(/_/g, '/')
                                     pdfMimeType = "application/pdf"
                                     // Only attach the first PDF found
                                     break
