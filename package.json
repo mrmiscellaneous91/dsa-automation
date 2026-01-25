@@ -15,7 +15,7 @@
     "googleapis": "^170.1.0",
     "next": "16.1.4",
     "next-auth": "^5.0.0-beta.30",
-    "pdf-parse": "^2.4.5",
+    "pdf-parse": "^1.1.1",
     "puppeteer": "^24.36.0",
     "puppeteer-core": "^24.36.0",
     "react": "19.2.3",
