@@ -35,9 +35,10 @@ function extractPONumber(text: string): string {
     console.log(`========================================`)
 
     // Priority 1: Look for labeled PO numbers (most reliable)
-    // Matches: "PO: 123456", "P.O. IP051665", "Order Number: 4477874224273", etc.
+    // Matches: "PO: 123456", "P.O. IPO51665", "Purchase Order NO.: IPO51565", etc.
     const labeledPatterns = [
-        /(?:PO|P\.O\.|Purchase Order|Order Number|Order No\.?|Order Reference)[:\s#-]*([A-Z0-9]+)/gi,
+        // This pattern handles "PURCHASE ORDER NO.: IPO51565" by matching everything up to ":"
+        /(?:PO|P\.O\.|Purchase Order|Order Number|Order No\.?|Order Reference)[^:]*:\s*([A-Z0-9]+)/gi,
     ]
 
     console.log(`[PO Extractor] Testing labeled patterns...`)
