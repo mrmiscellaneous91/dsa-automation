@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getGmailClient, listEmails, getEmail, extractEmailContent } from "@/lib/gmail"
+import { getGmailClient, listEmails, getEmail, extractEmailContent, getAttachment } from "@/lib/gmail"
 import { parseEmailWithAI } from "@/lib/parser"
+
+// pdf-parse is a CommonJS module, so we use require to avoid "no default export" errors
+const pdf = require("pdf-parse")
 
 export async function GET() {
     try {
@@ -24,7 +27,25 @@ export async function GET() {
                 const fullEmail = await getEmail(gmail, message.id!)
                 const subject = fullEmail.payload?.headers?.find((h: any) => h.name === "Subject")?.value || ""
                 const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
-                const body = extractEmailContent(fullEmail.payload)
+                let body = extractEmailContent(fullEmail.payload)
+
+                // PDF Extraction Logic
+                if (fullEmail.payload.parts) {
+                    for (const part of fullEmail.payload.parts) {
+                        if (part.mimeType === "application/pdf" && part.body?.attachmentId) {
+                            try {
+                                const attachment = await getAttachment(gmail, message.id!, part.body.attachmentId)
+                                if (attachment.data) {
+                                    const buffer = Buffer.from(attachment.data, "base64")
+                                    const pdfData = await pdf(buffer)
+                                    body += `\n\n[PDF ATTACHMENT CONTENT]:\n${pdfData.text}`
+                                }
+                            } catch (pdfErr) {
+                                console.error("Error parsing PDF:", pdfErr)
+                            }
+                        }
+                    }
+                }
 
                 const parsedData = await parseEmailWithAI(body, subject, from)
 

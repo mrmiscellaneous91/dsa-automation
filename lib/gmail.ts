@@ -64,3 +64,12 @@ export function extractEmailContent(payload: any) {
     }
     return body
 }
+
+export async function getAttachment(gmail: any, messageId: string, attachmentId: string) {
+    const res = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId,
+        id: attachmentId,
+    })
+    return res.data
+}
