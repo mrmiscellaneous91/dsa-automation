@@ -17,34 +17,45 @@ export interface ParsedRequest {
 }
 
 export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string): Promise<ParsedRequest> {
+    const senderLower = senderEmail.toLowerCase()
+    let identifiedProvider: ParsedRequest['provider'] = "Unknown"
+
+    if (senderLower.includes("barrybennett")) identifiedProvider = "Barry Bennett"
+    else if (senderLower.includes("remtek")) identifiedProvider = "Remtek"
+    else if (senderLower.includes("invate")) identifiedProvider = "Invate"
+    else if (senderLower.includes("assistive")) identifiedProvider = "Assistive"
+
     const prompt = `
     You are an expert data extractor for Audemic. 
     You receive emails from student equipment providers regarding license assignments.
 
-    PROVDIER IDENTIFICATION:
-    - If sender is "purchasing@barrybennett.co.uk" or contains "barrybennett" -> provider is "Barry Bennett"
-    - If sender contains "remtek" -> provider is "Remtek"
-    - If sender contains "invate" -> provider is "Invate"
-    - If sender contains "assistive" -> provider is "Assistive"
+    PROVIDER: ${identifiedProvider} (Verified from sender email)
+    SENDER: ${senderEmail}
+    SUBJECT: ${subject}
 
-    DATA TO EXTRACT:
-    - provider: Exactly one of "Remtek", "Invate", "Assistive", "Barry Bennett"
-    - providerContact: First name of the person who sent the email (look at signature).
-    - userName: Full name of the student. Often written in ALL CAPS. It is NOT the sender's name. It is the person getting the license.
-    - userEmail: The student's email address.
-    - licenseYears: Number of years (1, 2, 3, or 4). Look for phrases like "year licence" or "3 year".
-    - poNumber: The Purchase Order number (often starts with PO or is a long number).
+    GOAL: Extract the STUDENT'S details for a new Audemic license.
+    
+    CRITICAL RULES:
+    1. The SENDER (the person who sent the email) is NOT the student.
+    2. The STUDENT name is the person getting the license (usually written in ALL CAPS).
+    3. The STUDENT name is usually mentioned after phrases like "assign the following student" or "student name:".
+    4. Provide the result in VALID JSON.
 
-    SENDER EMAIL: ${senderEmail}
-    EMAIL SUBJECT: ${subject}
     EMAIL BODY:
     ${emailBody}
 
-    Return ONLY a JSON object with these keys. Be extremely careful to distinguish the SENDER name from the STUDENT name.
+    Return JSON:
+    {
+      "provider": "${identifiedProvider}",
+      "providerContact": "Name from signature",
+      "userName": "Student Full Name",
+      "userEmail": "Student Email Address",
+      "licenseYears": 1,
+      "poNumber": "PO12345"
+    }
   `
 
-    // 1. Try Gemini first
-    if (process.env.GEMINI_API_KEY) {
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "dummy") {
         try {
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
             const result = await model.generateContent(prompt)
@@ -52,48 +63,30 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
             const jsonStart = text.indexOf("{")
             const jsonEnd = text.lastIndexOf("}") + 1
             const jsonStr = text.substring(jsonStart, jsonEnd)
-            return JSON.parse(jsonStr)
+            const parsed = JSON.parse(jsonStr)
+            if (parsed.provider === "Unknown" || !parsed.provider) parsed.provider = identifiedProvider
+            return parsed
         } catch (error) {
-            console.error("Error parsing with Gemini:", error)
+            console.error("Gemini Parsing Error:", error)
         }
     }
 
-    // 2. Try Claude second
-    if (process.env.ANTHROPIC_API_KEY) {
-        try {
-            const message = await anthropic.messages.create({
-                model: "claude-3-5-sonnet-latest",
-                max_tokens: 1000,
-                messages: [{ role: "user", content: prompt }],
-            })
-            const content = message.content[0]
-            if (content.type === "text") {
-                return JSON.parse(content.text)
-            }
-        } catch (error) {
-            console.error("Error parsing with Claude:", error)
-        }
-    }
-
-    return fallbackParse(emailBody, subject, senderEmail)
+    return fallbackParse(emailBody, subject, senderEmail, identifiedProvider)
 }
 
-function fallbackParse(body: string, subject: string, senderEmail: string): ParsedRequest {
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/
-    const poRegex = /PO\d+|[0-9]{5,}/
-
-    let provider: ParsedRequest['provider'] = "Unknown"
-    if (senderEmail.includes("barrybennett")) provider = "Barry Bennett"
-    else if (senderEmail.includes("remtek")) provider = "Remtek"
-    else if (senderEmail.includes("invate")) provider = "Invate"
-    else if (senderEmail.includes("assistive")) provider = "Assistive"
+function fallbackParse(body: string, subject: string, senderEmail: string, provider: ParsedRequest['provider']): ParsedRequest {
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
+    const emails = body.match(emailRegex) || []
+    const senderAddress = senderEmail.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || ""
+    const studentEmail = emails.find(e => e.toLowerCase() !== senderAddress.toLowerCase()) || emails[0] || ""
+    const nameMatch = body.match(/[A-Z]{2,}\s[A-Z]{2,}(\s[A-Z]{2,})?/)
 
     return {
         provider,
         providerContact: "Team",
-        userName: "Unknown User",
-        userEmail: body.match(emailRegex)?.[0] || "",
+        userName: nameMatch ? nameMatch[0] : "Unknown User",
+        userEmail: studentEmail,
         licenseYears: body.includes("2 year") ? 2 : body.includes("3 year") ? 3 : body.includes("4 year") ? 4 : 1,
-        poNumber: body.match(poRegex)?.[0] || "",
+        poNumber: body.match(/PO\d+|[0-9]{5,}/)?.[0] || "",
     }
 }
