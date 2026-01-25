@@ -16,7 +16,7 @@ export interface ParsedRequest {
     poNumber: string
 }
 
-export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string): Promise<ParsedRequest> {
+export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string, attachmentBase64?: string, mimeType?: string): Promise<ParsedRequest> {
     const senderLower = senderEmail.toLowerCase()
     let identifiedProvider: ParsedRequest['provider'] = "Unknown"
 
@@ -25,7 +25,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     else if (senderLower.includes("invate.co.uk")) identifiedProvider = "Invate"
     else if (senderLower.includes("as-dsa.com") || senderLower.includes("unleashedsoftware.com")) identifiedProvider = "Assistive"
 
-    const prompt = `
+    const promptText = `
     You are an expert data extractor for Audemic. 
     IMPORTANT: You are looking for a STUDENT'S license details in an email from an equipment PROVIDER.
 
@@ -36,7 +36,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     GUIDELINES:
     1. The STUDENT is NOT the person who sent the email (e.g., Nicola from Remtek).
     2. The STUDENT name is often in ALL CAPS (like CADI HAF MURPHY or AYDIL GANIDAGLI).
-    3. The PO Number is usually a 7-digit number starting with 5 (e.g., 5078726).
+    3. The PO Number is usually a 7-digit number starting with 5 (e.g., 5078726). Look in the PDF if attached.
     4. LICENSE YEARS: Be extremely precise. 
        - If you see "3 year" or "three year", licenseYears is 3. 
        - If you see "1 year" or "one year", licenseYears is 1.
@@ -60,7 +60,20 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "dummy") {
         try {
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
-            const result = await model.generateContent(prompt)
+
+            const parts: any[] = [{ text: promptText }]
+
+            // Add attachment if present (Native Gemini PDF support)
+            if (attachmentBase64 && mimeType) {
+                parts.push({
+                    inlineData: {
+                        data: attachmentBase64,
+                        mimeType: mimeType
+                    }
+                })
+            }
+
+            const result = await model.generateContent(parts)
             const text = result.response.text()
             const jsonStart = text.indexOf("{")
             const jsonEnd = text.lastIndexOf("}") + 1

@@ -3,9 +3,6 @@ import { auth } from "@/lib/auth"
 import { getGmailClient, listEmails, getEmail, extractEmailContent, getAttachment } from "@/lib/gmail"
 import { parseEmailWithAI } from "@/lib/parser"
 
-// pdf-parse is a CommonJS module, so we use require to avoid "no default export" errors
-const pdf = require("pdf-parse")
-
 export async function GET() {
     try {
         const session = await auth()
@@ -29,25 +26,29 @@ export async function GET() {
                 const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
                 let body = extractEmailContent(fullEmail.payload)
 
-                // PDF Extraction Logic
+                // Native Gemini PDF Support
+                let pdfBase64 = undefined
+                let pdfMimeType = undefined
+
                 if (fullEmail.payload.parts) {
                     for (const part of fullEmail.payload.parts) {
                         if (part.mimeType === "application/pdf" && part.body?.attachmentId) {
                             try {
                                 const attachment = await getAttachment(gmail, message.id!, part.body.attachmentId)
                                 if (attachment.data) {
-                                    const buffer = Buffer.from(attachment.data, "base64")
-                                    const pdfData = await pdf(buffer)
-                                    body += `\n\n[PDF ATTACHMENT CONTENT]:\n${pdfData.text}`
+                                    pdfBase64 = attachment.data
+                                    pdfMimeType = "application/pdf"
+                                    // Only attach the first PDF found
+                                    break
                                 }
-                            } catch (pdfErr) {
-                                console.error("Error parsing PDF:", pdfErr)
+                            } catch (attErr) {
+                                console.error("Error fetching attachment:", attErr)
                             }
                         }
                     }
                 }
 
-                const parsedData = await parseEmailWithAI(body, subject, from)
+                const parsedData = await parseEmailWithAI(body, subject, from, pdfBase64, pdfMimeType)
 
                 // Skip if missing student email or if we already have this request
                 if (!parsedData.userEmail) continue;
