@@ -18,6 +18,68 @@ export interface ParsedRequest {
     poNumber: string
 }
 
+/**
+ * Helper function to extract PO number from PDF section
+ * Looks for numbers/codes near PO-related keywords (no format restrictions)
+ */
+function extractPONumber(text: string): string {
+    console.log(`\n========== PO EXTRACTOR DEBUG ==========`)
+
+    const pdfSection = text.includes('[PDF ATTACHMENT CONTENT]')
+        ? text.substring(text.indexOf('[PDF ATTACHMENT CONTENT]'))
+        : text
+
+    console.log(`[PO Extractor] PDF section length: ${pdfSection.length} chars`)
+    console.log(`[PO Extractor] First 500 chars of PDF section:`)
+    console.log(pdfSection.substring(0, 500))
+    console.log(`========================================`)
+
+    // Priority 1: Look for labeled PO numbers (most reliable)
+    // Matches: "PO: 123456", "P.O. IP051665", "Order Number: 4477874224273", etc.
+    const labeledPatterns = [
+        /(?:PO|P\.O\.|Purchase Order|Order Number|Order No\.?|Order Reference)[:\s#-]*([A-Z0-9]+)/gi,
+    ]
+
+    console.log(`[PO Extractor] Testing labeled patterns...`)
+    for (const pattern of labeledPatterns) {
+        const matches = [...pdfSection.matchAll(pattern)]
+        console.log(`[PO Extractor] Pattern ${pattern} found ${matches.length} matches`)
+
+        for (const match of matches) {
+            const candidate = match[1].trim()
+            console.log(`[PO Extractor] Checking candidate: "${candidate}" (length: ${candidate.length})`)
+
+            // Must be at least 3 characters and contain some digits
+            if (candidate.length >= 3 && /\d/.test(candidate)) {
+                console.log(`[PO Extractor] ✅ FOUND VALID LABELED PO: "${candidate}"`)
+                return candidate
+            } else {
+                console.log(`[PO Extractor] ❌ Rejected: too short or no digits`)
+            }
+        }
+    }
+
+    // Priority 2: Look for standalone long numbers (fallback)
+    console.log(`[PO Extractor] No labeled PO found, trying standalone patterns...`)
+    const standalonePattern = /\b([A-Z]{2,}[0-9]{4,}|[0-9]{7,})\b/g
+    const matches = [...pdfSection.matchAll(standalonePattern)]
+    console.log(`[PO Extractor] Standalone pattern found ${matches.length} matches`)
+
+    if (matches.length > 0) {
+        const candidates = matches.map(m => m[1])
+        console.log(`[PO Extractor] Standalone candidates:`, candidates)
+
+        // Return the longest match
+        const longest = candidates.sort((a, b) => b.length - a.length)[0]
+        console.log(`[PO Extractor] ✅ FOUND STANDALONE PO: "${longest}"`)
+        return longest
+    }
+
+    console.log(`[PO Extractor] ❌ NO PO NUMBER FOUND`)
+    console.log(`========================================\n`)
+    return ""
+}
+
 export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string): Promise<ParsedRequest> {
     const senderLower = senderEmail.toLowerCase()
     let identifiedProvider: ParsedRequest['provider'] = "Unknown"
@@ -40,14 +102,20 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
        - Do NOT use the string "[PDF ATTACHMENT CONTENT]" as a name.
        - Do NOT use the Provider's name (e.g., Nicola, Paul).
     2. STUDENT EMAIL: Look for this PRIMARILY in the EMAIL BODY. (e.g. outlook, hotmail, gmail, university address).
-    3. PO NUMBER: Look for this PRIMARILY in the [PDF ATTACHMENT CONTENT] section. It is usually a 7-digit number starting with 5 (e.g., 5078726, 90384).
+    3. PO NUMBER: **CRITICAL** - Extract this from the [PDF ATTACHMENT CONTENT] section ONLY.
+       - Look for values labeled as "PO", "P.O.", "Purchase Order", "Order Number", "Order Reference", etc.
+       - PO numbers can be ALPHANUMERIC (like "IP051665") or NUMERIC (like "4477874224273").
+       - Can be ANY LENGTH - short or long, just needs to be labeled as a PO/Order number.
+       - DO NOT extract random numbers from elsewhere - MUST be clearly labeled.
+       - If you cannot find a clearly labeled PO/Order number, return an empty string.
     4. LICENSE YEARS: Check BOTH the Email Body and PDF. 
        - If you see "3 year" or "three year", licenseYears is 3. 
        - Default is 1, but look carefully for "3" or "renewal".
 
     CRITICAL: The email body has extra text appended labeled "[PDF ATTACHMENT CONTENT]". 
     - Use the EMAIL BODY section for Name and Email.
-    - Use the PDF SECTION for PO Number and detailed order info.
+    - Use ONLY the [PDF ATTACHMENT CONTENT] section for PO Number.
+    - The PO number MUST have a label like "PO:", "Order Number:", etc. Don't extract unlabeled numbers.
 
     EMAIL CONTENT:
     ${emailBody}
@@ -61,7 +129,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
       "lastName": "Student Last Name",
       "userEmail": "Student Email",
       "licenseYears": 3,
-      "poNumber": "7-digit PO"
+      "poNumber": "PO from PDF (can be alphanumeric, any length)"
     }
   `
 
@@ -85,6 +153,26 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 const jsonStr = text.substring(jsonStart, jsonEnd)
                 const parsed = JSON.parse(jsonStr)
                 if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
+
+                console.log(`[Parser] AI extracted PO number: "${parsed.poNumber}"`)
+
+                // Validate PO number - should be at least 3 characters total
+                const poDigitsOnly = parsed.poNumber ? parsed.poNumber.replace(/\D/g, '') : ''
+                const poLength = parsed.poNumber ? parsed.poNumber.length : 0
+
+                // Invalid if: empty, less than 3 chars total, or less than 3 digits
+                if (!parsed.poNumber || poLength < 3 || poDigitsOnly.length < 3) {
+                    console.warn(`[Parser] AI extracted suspicious PO "${parsed.poNumber}". Attempting regex extraction...`)
+                    const regexPO = extractPONumber(emailBody)
+                    if (regexPO) {
+                        console.log(`[Parser] ✅ Regex found valid PO: ${regexPO}`)
+                        parsed.poNumber = regexPO
+                    } else {
+                        console.error(`[Parser] ❌ No valid PO found. Flagging for manual review.`)
+                        parsed.poNumber = parsed.poNumber ? `⚠️ ${parsed.poNumber}` : "⚠️ NOT FOUND"
+                    }
+                }
+
                 return parsed
             } else {
                 throw new Error("No valid JSON found in AI response")
@@ -107,6 +195,24 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 const jsonStr = text.substring(jsonStart, jsonEnd)
                 const parsed = JSON.parse(jsonStr)
                 if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
+
+                // Validate PO number - should be at least 3 characters total
+                const poDigitsOnly = parsed.poNumber ? parsed.poNumber.replace(/\D/g, '') : ''
+                const poLength = parsed.poNumber ? parsed.poNumber.length : 0
+
+                // Invalid if: empty, less than 3 chars total, or less than 3 digits
+                if (!parsed.poNumber || poLength < 3 || poDigitsOnly.length < 3) {
+                    console.warn(`[Parser] AI extracted suspicious PO "${parsed.poNumber}". Attempting regex extraction...`)
+                    const regexPO = extractPONumber(emailBody)
+                    if (regexPO) {
+                        console.log(`[Parser] ✅ Regex found valid PO: ${regexPO}`)
+                        parsed.poNumber = regexPO
+                    } else {
+                        console.error(`[Parser] ❌ No valid PO found. Flagging for manual review.`)
+                        parsed.poNumber = parsed.poNumber ? `⚠️ ${parsed.poNumber}` : "⚠️ NOT FOUND"
+                    }
+                }
+
                 return parsed
             }
         } catch (e) {
