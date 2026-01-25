@@ -21,8 +21,8 @@ export async function POST(req: Request) {
     const today = format(new Date(), "dd/MM/yyyy")
     const endDate = format(new Date(new Date().setFullYear(new Date().getFullYear() + Number(data.licenseYears))), "dd/MM/yyyy")
 
-    const first_name = data.userName.split(" ")[0]
-    const last_name = data.userName.split(" ").slice(1).join(" ")
+    const first_name = data.firstName || data.userName.split(" ")[0]
+    const last_name = data.lastName || data.userName.split(" ").slice(1).join(" ")
 
     // Calculate amount based on years (from implementation plan screenshots)
     // 1y: 106.92, 2y: 208.44, 3y: 309.96, 4y: 411.48

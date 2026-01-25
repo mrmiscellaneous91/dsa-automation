@@ -11,6 +11,8 @@ export interface ParsedRequest {
     provider: "Remtek" | "Invate" | "Assistive" | "Barry Bennett" | "Unknown"
     providerContact: string
     userName: string
+    firstName?: string
+    lastName?: string
     userEmail: string
     licenseYears: number
     poNumber: string
@@ -54,6 +56,8 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
       "provider": "${identifiedProvider}",
       "providerContact": "Sender First Name",
       "userName": "STUDENT FULL NAME",
+      "firstName": "Student First Name",
+      "lastName": "Student Last Name",
       "userEmail": "Student Email",
       "licenseYears": 3,
       "poNumber": "7-digit PO"
