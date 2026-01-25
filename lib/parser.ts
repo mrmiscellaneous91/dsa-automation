@@ -16,7 +16,7 @@ export interface ParsedRequest {
     poNumber: string
 }
 
-export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string, attachmentBase64?: string, mimeType?: string): Promise<ParsedRequest> {
+export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string): Promise<ParsedRequest> {
     const senderLower = senderEmail.toLowerCase()
     let identifiedProvider: ParsedRequest['provider'] = "Unknown"
 
@@ -25,7 +25,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     else if (senderLower.includes("invate.co.uk")) identifiedProvider = "Invate"
     else if (senderLower.includes("as-dsa.com") || senderLower.includes("unleashedsoftware.com")) identifiedProvider = "Assistive"
 
-    const promptText = `
+    const prompt = `
     You are an expert data extractor for Audemic. 
     IMPORTANT: You are looking for a STUDENT'S license details in an email from an equipment PROVIDER.
 
@@ -36,14 +36,15 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     GUIDELINES:
     1. The STUDENT is NOT the person who sent the email (e.g., Nicola from Remtek).
     2. The STUDENT name is often in ALL CAPS (like CADI HAF MURPHY or AYDIL GANIDAGLI).
-    3. The PO Number is usually a 7-digit number starting with 5. IT IS ALMOST CERTAINLY IN THE ATTACHED PDF.
+    3. The PO Number is usually a 7-digit number starting with 5. It might be labeled as "Purchase Order", "PO", "Order Ref", "Order Number".
     4. LICENSE YEARS: Be extremely precise. 
        - If you see "3 year" or "three year", licenseYears is 3. 
        - If you see "1 year" or "one year", licenseYears is 1.
-       - CHECK THE PDF CAREFULLY. If the email implies a renewal or 3 years, trust that over a default.
+       - CHECK THE PDF CONTENT SECTION CAREFULLY. If the email implies a renewal or 3 years, trust that over a default.
+       - DEFAULT is 1, but check the text carefully for '3'.
     5. The STUDENT email is usually an outlook, icloud, or university address.
     
-    CRITICAL: The PDF attachment contains the most accurate data. TRUST THE PDF over the email body if they conflict.
+    CRITICAL: The email body might contain appended PDF content labeled [PDF ATTACHMENT CONTENT]. TRUST THIS DATA above all else.
 
     EMAIL CONTENT:
     ${emailBody}
@@ -59,29 +60,18 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     }
   `
 
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "dummy") {
+    // Try Claude (Anthropic) if API key exists
+    if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== "dummy") {
         try {
-            // Using gemini-1.5-flash as it is more stable and widely available than pro for this API version
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+            console.log("[Parser] Sending request to Claude 3.5 Sonnet...")
+            const msg = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 1024,
+                messages: [{ role: "user", content: prompt }]
+            })
 
-            const parts: any[] = [{ text: promptText }]
-
-            // Add attachment if present (Native Gemini PDF support)
-            if (attachmentBase64 && mimeType) {
-                console.log(`[Parser] Attaching PDF (${attachmentBase64.length} chars) to Gemini request`)
-                parts.push({
-                    inlineData: {
-                        data: attachmentBase64,
-                        mimeType: mimeType
-                    }
-                })
-            } else {
-                console.log("[Parser] No PDF attachment found/passed")
-            }
-
-            const result = await model.generateContent(parts)
-            const text = result.response.text()
-            console.log("[Parser] Gemini Raw Response:", text)
+            const text = (msg.content[0] as any).text
+            console.log("[Parser] Claude Raw Response:", text)
 
             const jsonStart = text.indexOf("{")
             const jsonEnd = text.lastIndexOf("}") + 1
@@ -92,11 +82,30 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
                 return parsed
             } else {
-                console.error("No valid JSON found in AI response")
                 throw new Error("No valid JSON found in AI response")
             }
         } catch (error) {
-            console.error("Gemini Parsing Error:", error)
+            console.error("Claude Parsing Error:", error)
+        }
+    }
+
+    // Fallback to Gemini 1.5 Flash if Claude fails or key is missing
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "dummy") {
+        try {
+            console.log("[Parser] Fallback to Gemini 1.5 Flash...")
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+            const result = await model.generateContent(prompt)
+            const text = result.response.text()
+            const jsonStart = text.indexOf("{")
+            const jsonEnd = text.lastIndexOf("}") + 1
+            if (jsonStart !== -1 && jsonEnd > jsonStart) {
+                const jsonStr = text.substring(jsonStart, jsonEnd)
+                const parsed = JSON.parse(jsonStr)
+                if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
+                return parsed
+            }
+        } catch (e) {
+            console.error("Gemini Fallback Error:", e)
         }
     }
 

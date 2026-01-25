@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth"
 import { getGmailClient, listEmails, getEmail, extractEmailContent, getAttachment } from "@/lib/gmail"
 import { parseEmailWithAI } from "@/lib/parser"
 
+// pdf-parse is a CommonJS module, so we use require to avoid "no default export" errors
+const pdf = require("pdf-parse")
+
 export async function GET() {
     try {
         const session = await auth()
@@ -26,30 +29,33 @@ export async function GET() {
                 const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
                 let body = extractEmailContent(fullEmail.payload)
 
-                // Native Gemini PDF Support
-                let pdfBase64 = undefined
-                let pdfMimeType = undefined
-
+                // PDF Extraction Logic (Text)
+                let pdfText = ""
                 if (fullEmail.payload.parts) {
                     for (const part of fullEmail.payload.parts) {
                         if (part.mimeType === "application/pdf" && part.body?.attachmentId) {
                             try {
                                 const attachment = await getAttachment(gmail, message.id!, part.body.attachmentId)
                                 if (attachment.data) {
-                                    // Convert from Base64URL to Standard Base64 for Gemini
-                                    pdfBase64 = attachment.data.replace(/-/g, '+').replace(/_/g, '/')
-                                    pdfMimeType = "application/pdf"
-                                    // Only attach the first PDF found
-                                    break
+                                    // Convert Base64Url to Buffer
+                                    const base64 = attachment.data.replace(/-/g, '+').replace(/_/g, '/')
+                                    const buffer = Buffer.from(base64, "base64")
+                                    const pdfData = await pdf(buffer)
+                                    pdfText += `\n\n[PDF ATTACHMENT CONTENT]:\n${pdfData.text}`
                                 }
-                            } catch (attErr) {
-                                console.error("Error fetching attachment:", attErr)
+                            } catch (pdfErr) {
+                                console.error("Error parsing PDF:", pdfErr)
                             }
                         }
                     }
                 }
 
-                const parsedData = await parseEmailWithAI(body, subject, from, pdfBase64, pdfMimeType)
+                // Append PDF text to body if found, to give Claude full context
+                if (pdfText) {
+                    body += pdfText
+                }
+
+                const parsedData = await parseEmailWithAI(body, subject, from)
 
                 // Skip if missing student email or if we already have this request
                 if (!parsedData.userEmail) continue;
