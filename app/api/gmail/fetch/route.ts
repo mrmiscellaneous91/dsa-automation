@@ -24,7 +24,7 @@ export async function GET() {
         const from = fullEmail.payload?.headers?.find((h: any) => h.name === "From")?.value || ""
         const body = extractEmailContent(fullEmail.payload)
 
-        const parsedData = await parseEmailWithAI(body, subject)
+        const parsedData = await parseEmailWithAI(body, subject, from)
 
         tasks.push({
             id: message.id,
