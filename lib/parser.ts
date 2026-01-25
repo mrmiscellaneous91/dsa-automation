@@ -36,8 +36,11 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     GUIDELINES:
     1. The STUDENT is NOT the person who sent the email (e.g., Nicola from Remtek).
     2. The STUDENT name is often in ALL CAPS (like CADI HAF MURPHY or AYDIL GANIDAGLI).
-    3. The PO Number is usually a 7-digit number (like 5078726) or starts with "PO".
-    4. License years are 1, 2, 3, or 4. Look for "X year licence".
+    3. The PO Number is usually a 7-digit number starting with 5 (e.g., 5078726).
+    4. LICENSE YEARS: Be extremely precise. 
+       - If you see "3 year" or "three year", licenseYears is 3. 
+       - If you see "1 year" or "one year", licenseYears is 1.
+       - DEFAULT is 1, but check the text carefully for '3'.
     5. The STUDENT email is usually an outlook, icloud, or university address.
 
     EMAIL CONTENT:

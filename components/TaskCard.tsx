@@ -23,7 +23,10 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                 method: "POST",
                 body: JSON.stringify({ data: parsed }),
             })
-            if (!res.ok) throw new Error("Failed to log to sheets")
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.error || "Failed to log to sheets")
+            }
             setStep(2)
         } catch (err: any) {
             setError(err.message)

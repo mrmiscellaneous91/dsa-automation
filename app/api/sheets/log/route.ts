@@ -18,8 +18,8 @@ export async function POST(req: Request) {
     // G: product_name, H: amount, I: supplier_name, J: po_issue_date, K: Licence-issued-to-End-User, 
     // L: ???, M: ???, N: start_date, O: end_date
 
-    const today = format(new Date(), "d-M-yyyy")
-    const endDate = format(new Date(new Date().setFullYear(new Date().getFullYear() + Number(data.licenseYears))), "d-M-yyyy")
+    const today = format(new Date(), "dd/MM/yyyy")
+    const endDate = format(new Date(new Date().setFullYear(new Date().getFullYear() + Number(data.licenseYears))), "dd/MM/yyyy")
 
     const first_name = data.userName.split(" ")[0]
     const last_name = data.userName.split(" ").slice(1).join(" ")
@@ -51,6 +51,12 @@ export async function POST(req: Request) {
         await appendToSheet(sheets, spreadsheetId, "Master!A:A", [row])
         return NextResponse.json({ success: true })
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error("Sheets Error Details:", {
+            message: error.message,
+            status: error.status,
+            errors: error.response?.data?.error?.errors
+        })
+        const detail = error.response?.data?.error?.message || error.message
+        return NextResponse.json({ error: `Sheets Error: ${detail}` }, { status: 500 })
     }
 }
