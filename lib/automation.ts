@@ -53,10 +53,25 @@ export async function automateUserCreation(userData: {
 
         // Check if we need to log in
         if (page.url().includes("/users/sign_in")) {
-            console.log("[Automation] Filling login form...")
-            await page.type('input[name="user[email]"]', adminEmail)
-            await page.type('input[name="user[password]"]', adminPassword)
-            await page.click('input[name="commit"]')
+            console.log("[Automation] On sign-in page, filling login form...")
+
+            // Dismiss cookie banner if present (ignore if not found)
+            await page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const okBtn = buttons.find(b => b.textContent?.includes('OK'));
+                if (okBtn) (okBtn as HTMLElement).click();
+            }).catch(() => { });
+
+            // Wait for form elements to be ready
+            await page.waitForSelector('#user_email', { visible: true, timeout: 5000 })
+            await page.waitForSelector('#password', { visible: true, timeout: 5000 })
+
+            // Use IDs which are more reliable than name attributes
+            await page.type('#user_email', adminEmail)
+            await page.type('#password', adminPassword)
+
+            // Click submit button
+            await page.click('input[type="submit"]')
 
             // Wait for navigation or URL change (login might use AJAX)
             try {
