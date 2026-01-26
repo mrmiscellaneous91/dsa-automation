@@ -92,17 +92,40 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
         : emailBody
 
     console.log('[Name Extract] Looking for name near email:', studentEmail)
+    console.log('[Name Extract] Body length:', bodyOnly.length)
 
     // Find the email in the body
-    const emailIndex = bodyOnly.indexOf(studentEmail)
+    let emailIndex = bodyOnly.indexOf(studentEmail)
+
+    // If exact email not found, try finding without the mailto wrapper
+    if (emailIndex === -1 && studentEmail.includes('@')) {
+        const emailPart = studentEmail.split('<')[0].trim()
+        emailIndex = bodyOnly.indexOf(emailPart)
+        if (emailIndex !== -1) {
+            console.log('[Name Extract] Found email variant:', emailPart)
+        }
+    }
+
     if (emailIndex === -1) {
-        console.log('[Name Extract] Student email not found in body')
+        console.log('[Name Extract] Email not found in body, trying fallback to find any name pattern...')
+        // Fallback: just find any name in the body
+        const namePattern = /([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/
+        const match = bodyOnly.match(namePattern)
+        if (match) {
+            const name = match[1].trim()
+            const invalidPatterns = ['PDF', 'ATTACHMENT', 'PURCHASE', 'ORDER', 'CONTENT', 'EMAIL', 'YEAR', 'Vicki', 'Operations', 'Manager']
+            if (!invalidPatterns.some(invalid => name.includes(invalid))) {
+                console.log('[Name Extract] ✅ Fallback found name:', name)
+                return name
+            }
+        }
+        console.log('[Name Extract] ❌ No valid name found in fallback')
         return ""
     }
 
     // Get text before the email (usually contains the name)
     const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 200), emailIndex)
-    console.log('[Name Extract] Text before email:', textBeforeEmail.substring(textBeforeEmail.length - 100))
+    console.log('[Name Extract] Text before email (last 100 chars):', textBeforeEmail.substring(Math.max(0, textBeforeEmail.length - 100)))
 
     // Look for name patterns in the text before email
     // Pattern 1: Standard capitalized name (e.g., "Amal Ahmed", "John Smith")
@@ -115,6 +138,8 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
 
     // Get the last match (closest to email) from either pattern
     const allMatches = [...matches1, ...matches2]
+    console.log('[Name Extract] Found', allMatches.length, 'potential names')
+
     if (allMatches.length > 0) {
         const lastMatch = allMatches[allMatches.length - 1][1].trim()
 
