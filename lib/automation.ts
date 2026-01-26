@@ -57,7 +57,14 @@ export async function automateUserCreation(userData: {
             await page.type('input[name="user[email]"]', adminEmail)
             await page.type('input[name="user[password]"]', adminPassword)
             await page.click('input[name="commit"]')
-            await page.waitForNavigation({ waitUntil: "networkidle2" })
+
+            // Wait for navigation or URL change (login might use AJAX)
+            try {
+                await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 })
+            } catch (e) {
+                // Navigation might not happen if AJAX login - just wait a moment
+                await new Promise(resolve => setTimeout(resolve, 3000))
+            }
         }
 
         // Verify Login Success by checking we're not on the sign-in page
