@@ -51,6 +51,12 @@ export async function sendEmail(gmail: any, to: string, subject: string, body: s
 
 export function extractEmailContent(payload: any) {
     let body = ""
+    // Helper to decode Gmail's base64url format
+    const decodeBase64 = (data: string) => {
+        if (!data) return ""
+        const base64 = data.replace(/-/g, '+').replace(/_/g, '/')
+        return Buffer.from(base64, "base64").toString()
+    }
 
     // Helper to strip HTML tags if we only have HTML
     const stripHtml = (html: string) => {
@@ -67,7 +73,7 @@ export function extractEmailContent(payload: any) {
         // First pass: look for plain text
         for (const part of payload.parts) {
             if (part.mimeType === "text/plain" && part.body?.data) {
-                body += Buffer.from(part.body.data, "base64").toString()
+                body += decodeBase64(part.body.data)
             } else if (part.parts) {
                 body += extractEmailContent(part)
             }
@@ -77,13 +83,13 @@ export function extractEmailContent(payload: any) {
         if (!body) {
             for (const part of payload.parts) {
                 if (part.mimeType === "text/html" && part.body?.data) {
-                    const html = Buffer.from(part.body.data, "base64").toString()
+                    const html = decodeBase64(part.body.data)
                     body += stripHtml(html)
                 }
             }
         }
     } else if (payload.body?.data) {
-        const content = Buffer.from(payload.body.data, "base64").toString()
+        const content = decodeBase64(payload.body.data)
         if (payload.mimeType === "text/html") {
             body = stripHtml(content)
         } else {

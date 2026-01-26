@@ -23,57 +23,35 @@ export interface ParsedRequest {
  */
 function extractPONumber(fullEmailBody: string): string {
     // Step 1: Get just the PDF section
-    if (!fullEmailBody.includes('[PDF ATTACHMENT CONTENT]')) {
+    const pdfMarker = /\[PDF ATTACHMENT CONTENT\]/i
+    const markerMatch = fullEmailBody.match(pdfMarker)
+    if (!markerMatch) {
         console.log('[PO Extract] No PDF found in email')
         return ""
     }
 
-    const pdfText = fullEmailBody.substring(fullEmailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
+    const pdfText = fullEmailBody.substring(markerMatch.index!)
     console.log('[PO Extract] PDF section length:', pdfText.length)
-    console.log('[PO Extract] First 300 chars:', pdfText.substring(0, 300))
 
     // Step 2: Try patterns in order of reliability
     const patterns = [
-        // Pattern 1: Labeled with colon "PURCHASE ORDER NO.: IPO51565" or "PO: 123456"
         /(?:PURCHASE ORDER NO\.|PO NO\.|ORDER NO\.|PO|P\.O\.)\s*:\s*([A-Z0-9]{5,15})/i,
-
-        // Pattern 2: Remtek's concatenated format "PAGEPPO NUMBERPO Date\n1 / 150353502026"
-        // Extracts exactly 7-digit PO from format like "1 / 150353502026"
         /PO NUMBER.*?[\s\n]+(?:[\d]+\s*\/\s*)?1([0-9]{7})20\d{2}/i,
-
-        // Pattern 3: Standalone alphanumeric codes (e.g., IPO51565)
         /\b([A-Z]{2,}[0-9]{4,8})\b/,
-
-        // Pattern 4: Standalone numbers 6-10 digits (avoid dates by limiting to 10 max)
-        /\b([56][0-9]{5,9})\b/  // Must start with 5 or 6 (typical PO prefixes)
+        /\b([56][0-9]{5,9})\b/
     ]
 
     for (let i = 0; i < patterns.length; i++) {
-        console.log(`[PO Extract] Testing pattern ${i + 1}...`)
         const match = pdfText.match(patterns[i])
         if (match && match[1]) {
             const po = match[1].trim()
-
-            // Skip if it looks like a date (contains typical date year like 2024-2026)
-            if (/^20[0-9]{6,}/.test(po)) {
-                console.log(`[PO Extract] ⏭️  Pattern ${i + 1} skipped "${po}" (looks like date)`)
-                continue
-            }
-
-            // Skip if it looks like a phone number
-            if (/^(44|07|01|02|03)[0-9]{8,}/.test(po)) {
-                console.log(`[PO Extract] ⏭️  Pattern ${i + 1} skipped "${po}" (looks like phone number)`)
-                continue
-            }
-
-            console.log(`[PO Extract] ✅ Pattern ${i + 1} found: "${po}"`)
+            if (/^20[0-9]{6,}/.test(po)) continue // Skip dates
+            if (/^(44|07|01|02|03)[0-9]{8,}/.test(po)) continue // Skip phone numbers
+            console.log(`[PO Extract] ✅ Found: "${po}"`)
             return po
-        } else {
-            console.log(`[PO Extract] Pattern ${i + 1} - no match`)
         }
     }
 
-    console.log('[PO Extract] ❌ No PO number found')
     return ""
 }
 
@@ -87,9 +65,9 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     }
 
     // Get only the email body section (before PDF)
-    const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
-        ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
-        : emailBody
+    const pdfMarker = /\[PDF ATTACHMENT CONTENT\]/i
+    const markerMatch = emailBody.match(pdfMarker)
+    const bodyOnly = markerMatch ? emailBody.substring(0, markerMatch.index) : emailBody
 
     console.log('[Name Extract] Looking for name near email:', studentEmail)
     console.log('[Name Extract] Body length:', bodyOnly.length)
@@ -116,7 +94,7 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
         emailIndex = normalizedBody.indexOf(anchor.toLowerCase())
     }
 
-    // Fallback: if no anchor match, try finding ANY personal email in the body
+    // if anchor not found, try finding ANY personal email in the body
     if (emailIndex === -1) {
         console.log('[Name Extract] No anchor match, trying fallback to find any personal email...')
         const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
@@ -126,73 +104,64 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
         }
     }
 
-    if (emailIndex === -1) {
-        console.log('[Name Extract] No anchor point found in body for name extraction')
-        return ""
-    }
-
-    // Get text before the email (usually contains the name)
-    const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 250), emailIndex)
-
-    // Normalize text - replace newlines and Unicode spaces with spaces
-    const normalizedText = textBeforeEmail.replace(/[\r\n\t\u2000-\u200B]+/g, ' ').replace(/\s+/g, ' ')
-    console.log('[Name Extract] Normalized text sample:', normalizedText.slice(-100))
-
-    // Pattern 1: Standard capitalized name (2-6 words, allowing hyphens and apostrophes)
-    const namePattern1 = /\b([A-Z][A-Za-z'-]+(?:\s[A-Z][A-Za-z'-]+)+)\b/g
-    const matches1 = [...normalizedText.matchAll(namePattern1)]
-
-    // Pattern 2: ALL CAPS name (e.g., "AMAL AHMED")
-    const namePattern2 = /\b([A-Z]{2,}(?:\s[A-Z]{2,})+)\b/g
-    const matches2 = [...normalizedText.matchAll(namePattern2)]
-
-    // Get all matches as strings
-    const allMatches = [...matches1.map(m => m[1]), ...matches2.map(m => m[1])]
-    console.log('[Name Extract] Found', allMatches.length, 'potential names:', allMatches)
-
-    // Filter out common labels/false positives
+    // Helper to extract matches from any text block
     const invalidPatterns = [
         'Student Name', 'Student Email', 'User Name', 'End User',
         'Operations Manager', 'Procurement', 'Best Regards', 'Kind Regards',
         'Good Morning', 'Good Afternoon', 'Hello Joshua', 'Dear Joshua',
-        'Audemic Licence', 'Audemic Scholar', 'Please Joshua', 'Joshua Please'
+        'Audemic Licence', 'Audemic Scholar', 'Licence', 'Scholar', 'Please', 'Support', 'Audemic'
     ]
 
-    const validMatches = allMatches
-        .map(match => {
-            // Clean up: aggressively remove trailing labels that might have been captured
-            let cleaned = match.trim()
-            const labelPattern = /\s+(Student|Email|User|Status|Name|Licence|Scholar|Dear|Hello|Best|Regards|Morning|Afternoon|Joshua)$/i
+    const processMatches = (text: string) => {
+        const normalizedText = text.replace(/[\r\n\t\u2000-\u200B]+/g, ' ').replace(/\s+/g, ' ')
+        const namePattern1 = /\b([A-Z][A-Za-z'-]+(?:\s[A-Z][A-Za-z'-]+)+)\b/g
+        const namePattern2 = /\b([A-Z]{2,}(?:\s[A-Z]{2,})+)\b/g
 
-            // Run up to 3 times to catch "Student Email Name" etc.
-            for (let i = 0; i < 3; i++) {
-                if (labelPattern.test(cleaned)) {
-                    cleaned = cleaned.replace(labelPattern, '').trim()
-                } else {
-                    break
+        const rawMatches = [...normalizedText.matchAll(namePattern1), ...normalizedText.matchAll(namePattern2)]
+        const labelPattern = /\s+(Student|Email|User|Status|Name|Licence|Scholar|Dear|Hello|Best|Regards|Morning|Afternoon|Joshua)$/i
+
+        return rawMatches
+            .map(m => {
+                let cleaned = m[1].trim()
+                for (let i = 0; i < 3; i++) {
+                    if (labelPattern.test(cleaned)) {
+                        cleaned = cleaned.replace(labelPattern, '').trim()
+                    } else {
+                        break
+                    }
                 }
-            }
-            return cleaned
-        })
-        .filter(match => {
-            const upper = match.toUpperCase()
-            // Names should usually be 2-6 words
-            const wordCount = match.split(/\s+/).length
-            if (wordCount < 2 || wordCount > 6) return false
-
-            return !invalidPatterns.some(invalid => upper.includes(invalid.toUpperCase()))
-        })
-
-    console.log('[Name Extract] Valid matches after filtering:', validMatches)
-
-    if (validMatches.length > 0) {
-        // Pick the match closest to the email (the last match in textBeforeEmail)
-        const bestMatch = validMatches[validMatches.length - 1]
-        console.log('[Name Extract] ✅ Found name:', bestMatch)
-        return bestMatch
+                return cleaned
+            })
+            .filter(match => {
+                const upper = match.toUpperCase()
+                const wordCount = match.split(/\s+/).length
+                if (wordCount < 2 || wordCount > 6) return false
+                return !invalidPatterns.some(invalid => upper.includes(invalid.toUpperCase()))
+            })
     }
 
-    console.log('[Name Extract] ❌ No name pattern found')
+    if (emailIndex !== -1) {
+        // Get text before the email (usually contains the name)
+        const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 250), emailIndex)
+        const validMatches = processMatches(textBeforeEmail)
+
+        if (validMatches.length > 0) {
+            const bestMatch = validMatches[validMatches.length - 1]
+            console.log('[Name Extract] ✅ Found name near email:', bestMatch)
+            return bestMatch
+        }
+    }
+
+    // FINAL FALLBACK: Search the entire body for any valid-looking name
+    console.log('[Name Extract] Still no name, searching entire body for patterns...')
+    const globalMatches = processMatches(bodyOnly)
+    if (globalMatches.length > 0) {
+        const bestFallback = globalMatches[0]
+        console.log('[Name Extract] ✅ Global fallback found name:', bestFallback)
+        return bestFallback
+    }
+
+    console.log('[Name Extract] ❌ No name found anywhere in body')
     return ""
 }
 
@@ -267,50 +236,24 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 const parsed = JSON.parse(jsonStr)
                 if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
 
-                // ALWAYS use regex extraction for PO number (don't trust AI for this)
-                console.log('[Parser] Using regex to extract PO number...')
-                parsed.poNumber = extractPONumber(emailBody)
+                // ALWAYS use regex extraction for PO number
+                parsed.poNumber = extractPONumber(emailBody) || "⚠️ NOT FOUND"
 
-                if (!parsed.poNumber) {
-                    console.error('[Parser] ❌ PO extraction failed')
-                    parsed.poNumber = "⚠️ NOT FOUND"
-                }
+                // ALWAYS use proximity-based name extraction
+                console.log('[Parser] Using proximity extraction...')
+                const extractedName = extractStudentName(emailBody, parsed.userEmail)
 
-                // ALWAYS use proximity-based name extraction (more reliable than AI)
-                console.log('[Parser] Using proximity extraction for student name...')
-                console.log('[Parser] AI extracted email:', parsed.userEmail)
-
-                let extractedName = extractStudentName(emailBody, parsed.userEmail)
-
-                // If that failed, try to find a personal email in the body and extract name near that
-                if (!extractedName) {
-                    console.log('[Parser] Primary extraction failed, trying fallback...')
-                    // Find any personal email (gmail, hotmail, icloud, etc.) in the body before PDF
-                    const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
-                        ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
-                        : emailBody
-                    const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
-                    if (personalEmailMatch) {
-                        console.log('[Parser] Found personal email in body:', personalEmailMatch[0])
-                        extractedName = extractStudentName(emailBody, personalEmailMatch[0])
-                    }
-                }
-
-                // Final assignment
                 if (extractedName) {
                     parsed.userName = extractedName
                     const nameParts = extractedName.split(/\s+/)
                     parsed.firstName = nameParts[0]
                     parsed.lastName = nameParts.slice(1).join(' ') || nameParts[0]
-                    console.log('[Parser] ✅ Final name:', extractedName)
                 } else {
                     console.warn('[Parser] ⚠️  Name extraction failed completely')
                     parsed.userName = "⚠️ Name Not Found"
                 }
 
                 return parsed
-            } else {
-                throw new Error("No valid JSON found in AI response")
             }
         } catch (error) {
             console.error("Claude Parsing Error:", error)
@@ -332,39 +275,17 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 if (!parsed.provider || parsed.provider === "Unknown") parsed.provider = identifiedProvider
 
                 // ALWAYS use regex extraction for PO number
-                console.log('[Parser] Using regex to extract PO number...')
-                parsed.poNumber = extractPONumber(emailBody)
-
-                if (!parsed.poNumber) {
-                    console.error('[Parser] ❌ PO extraction failed')
-                    parsed.poNumber = "⚠️ NOT FOUND"
-                }
+                parsed.poNumber = extractPONumber(emailBody) || "⚠️ NOT FOUND"
 
                 // ALWAYS use proximity-based name extraction
-                console.log('[Parser] Using proximity extraction for student name...')
-                console.log('[Parser] AI extracted email:', parsed.userEmail)
-
-                let extractedName = extractStudentName(emailBody, parsed.userEmail)
-
-                // If that failed, try to find a personal email in the body
-                if (!extractedName) {
-                    console.log('[Parser] Primary extraction failed, trying fallback...')
-                    const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
-                        ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
-                        : emailBody
-                    const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
-                    if (personalEmailMatch) {
-                        console.log('[Parser] Found personal email in body:', personalEmailMatch[0])
-                        extractedName = extractStudentName(emailBody, personalEmailMatch[0])
-                    }
-                }
+                console.log('[Parser] Using proximity extraction...')
+                const extractedName = extractStudentName(emailBody, parsed.userEmail)
 
                 if (extractedName) {
                     parsed.userName = extractedName
                     const nameParts = extractedName.split(/\s+/)
                     parsed.firstName = nameParts[0]
                     parsed.lastName = nameParts.slice(1).join(' ') || nameParts[0]
-                    console.log('[Parser] ✅ Final name:', extractedName)
                 } else {
                     console.warn('[Parser] ⚠️  Name extraction failed completely')
                     parsed.userName = "⚠️ Name Not Found"
@@ -382,11 +303,6 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
 function fallbackParse(body: string, subject: string, senderEmail: string, provider: ParsedRequest['provider']): ParsedRequest {
     console.log('[Fallback Parser] AI parsing failed, using fallback...')
-
-    // Extract only email body (before PDF section) for name extraction
-    const emailBodyOnly = body.includes('[PDF ATTACHMENT CONTENT]')
-        ? body.substring(0, body.indexOf('[PDF ATTACHMENT CONTENT]'))
-        : body
 
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
     const emails = body.match(emailRegex) || []
