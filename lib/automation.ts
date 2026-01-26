@@ -22,56 +22,87 @@ export async function automateUserCreation(userData: {
     let browser
     try {
         if (browserlessToken) {
-            // Use Browserless for web deployment
             browser = await puppeteerCore.connect({
                 browserWSEndpoint: `wss://chrome.browserless.io?token=${browserlessToken}`,
             })
         } else {
-            // Use local Puppeteer for development
             browser = await puppeteer.launch({ headless: true })
         }
 
         const page = await browser.newPage()
+        // Set a reasonable viewport for rails_admin
+        await page.setViewport({ width: 1280, height: 800 })
 
         // 1. Login
+        console.log("[Automation] Logging into admin panel...")
         await page.goto("https://www.audemic.app/admin/login", { waitUntil: "networkidle2" })
-        await page.type('input[name="email"]', adminEmail)
-        await page.type('input[name="password"]', adminPassword)
-        await page.click('button[type="submit"]')
-        await page.waitForNavigation()
 
-        // 2. Navigate to User Creation
-        // Note: Based on screenshots, we need to click "Add a new User"
-        await page.goto("https://www.audemic.app/admin/users/add", { waitUntil: "networkidle2" })
+        // Check if already logged in
+        if (page.url().includes("/admin/login")) {
+            await page.type('input[name="admin_user[email]"]', adminEmail)
+            await page.type('input[name="admin_user[password]"]', adminPassword)
+            await page.click('input[type="submit"]')
+            await page.waitForNavigation({ waitUntil: "networkidle2" })
+        }
 
-        await page.type('input[name="email"]', userData.email)
-        await page.type('input[name="password"]', "Audemic@123")
+        // 2. Create User
+        console.log(`[Automation] Creating user: ${userData.email}`)
+        await page.goto("https://www.audemic.app/admin/user/new", { waitUntil: "networkidle2" })
+
+        await page.type('input[name="user[email]"]', userData.email)
+        await page.type('input[name="user[password]"]', "Audemic@123")
 
         const names = userData.userName.split(" ")
-        await page.type('input[name="first_name"]', names[0])
-        await page.type('input[name="last_name"]', names.slice(1).join(" "))
+        const firstName = names[0]
+        const lastName = names.slice(1).join(" ") || firstName
 
-        // Set active and confirmed (based on switches in screenshot)
-        // We'll use click for the switches if they are checkboxes or buttons
-        // This part might need adjustment based on exact HTML selectors
+        await page.type('input[name="user[first_name]"]', firstName)
+        await page.type('input[name="user[last_name]"]', lastName)
 
-        await page.click('button[type="submit"]')
-        await page.waitForNavigation()
+        // Submit user creation
+        await page.click('button[name="_save"]')
+        await page.waitForNavigation({ waitUntil: "networkidle2" })
 
-        // 3. Add Subscription
-        // Navigate to where subscriptions are added for this user
-        // Based on screenshots, it's often a separate form or related list
+        // 3. Create Subscription
+        console.log(`[Automation] Creating subscription for ${userData.email} (${userData.licenseYears} years)`)
+        await page.goto("https://www.audemic.app/admin/subscription/new", { waitUntil: "networkidle2" })
 
-        // This is a placeholder for the exact navigation to the subscription form
-        // await page.goto(`https://www.audemic.app/admin/subscriptions/add?user_email=${userData.email}`)
+        // Find the User mapping (searchable dropdown)
+        await page.click('.ra-filtering-select-input')
+        await page.keyboard.type(userData.email)
+        await new Promise(resolve => setTimeout(resolve, 1500)) // Wait for search results
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Enter')
 
-        // Select Plan type: "Yearly"
-        // Set Start date: Now
-        // Set End date: Now + years
+        // Set Plan Type to Yearly
+        await page.select('select#subscription_plan_type', 'yearly')
 
-        // await page.select('select[name="plan_type"]', "Yearly")
-        // await page.click('button[type="submit"]')
+        // Set Dates
+        const startDate = new Date().toISOString().split('T')[0]
+        const endDateObj = new Date()
+        endDateObj.setFullYear(endDateObj.getFullYear() + userData.licenseYears)
+        const endDate = endDateObj.toISOString().split('T')[0]
 
+        await page.type('input#subscription_start_date', startDate)
+        await page.type('input#subscription_end_date', endDate)
+
+        // Set Active to True (checkbox or specific toggle)
+        try {
+            await page.click('input#subscription_active_1')
+        } catch (e) {
+            console.log("[Automation] Could not find specific active toggle, trying generic checkbox...")
+            const activeCheckbox = await page.$('input[name="subscription[active]"]')
+            if (activeCheckbox) {
+                const isChecked = await (await activeCheckbox.getProperty('checked')).jsonValue()
+                if (!isChecked) await activeCheckbox.click()
+            }
+        }
+
+        // Save Subscription
+        await page.click('button[name="_save"]')
+        await page.waitForNavigation({ waitUntil: "networkidle2" })
+
+        console.log("[Automation] Success: User and Subscription created.")
         await browser.close()
         return { success: true }
     } catch (error: any) {
