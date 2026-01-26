@@ -82,7 +82,7 @@ export default function Home() {
 
       {/* Control Bar */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <span className="flex h-3 w-3 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
@@ -90,6 +90,14 @@ export default function Home() {
           <p className="text-sm font-semibold text-gray-700">
             {tasks.length} Pending Requests
           </p>
+          {tasks.length > 0 && (
+            <button
+              onClick={() => { setTasks([]); localStorage.removeItem('dsa-tasks'); }}
+              className="text-xs text-red-500 hover:text-red-700 font-medium"
+            >
+              Clear All
+            </button>
+          )}
         </div>
         <button
           onClick={fetchTasks}
