@@ -47,22 +47,25 @@ export async function automateUserCreation(userData: {
         const page = await browser.newPage()
         await page.setViewport({ width: 1280, height: 1000 })
 
-        // 1. Login
-        console.log("[Automation] Logging into admin panel...")
-        await page.goto("https://www.audemic.app/admin/login", { waitUntil: "networkidle2" })
+        // 1. Login via /users/sign_in (admin uses same user session)
+        console.log("[Automation] Logging in via /users/sign_in...")
+        await page.goto("https://www.audemic.app/users/sign_in", { waitUntil: "networkidle2" })
 
-        if (page.url().includes("/admin/login")) {
-            await page.type('input[name="admin_user[email]"]', adminEmail)
-            await page.type('input[name="admin_user[password]"]', adminPassword)
-            await page.click('input[type="submit"]')
+        // Check if we need to log in
+        if (page.url().includes("/users/sign_in")) {
+            console.log("[Automation] Filling login form...")
+            await page.type('input[name="user[email]"]', adminEmail)
+            await page.type('input[name="user[password]"]', adminPassword)
+            await page.click('input[name="commit"]')
             await page.waitForNavigation({ waitUntil: "networkidle2" })
         }
 
-        // Verify Login Success
-        const currentTitle = await page.title()
-        if (currentTitle.includes("Login")) {
-            throw new Error(`Login failed or redirected back to login page. ${await getDiagnosticInfo(page)}`)
+        // Verify Login Success by checking we're not on the sign-in page
+        const currentUrl = page.url()
+        if (currentUrl.includes("/users/sign_in")) {
+            throw new Error(`Login failed - still on sign_in page. ${await getDiagnosticInfo(page)}`)
         }
+        console.log(`[Automation] Login successful, current URL: ${currentUrl}`)
 
         // 2. Start Subscription / Add New User (Nested)
         console.log(`[Automation] Navigating to New Subscription page...`)
