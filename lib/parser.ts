@@ -30,6 +30,7 @@ function extractPONumber(fullEmailBody: string): string {
 
     const pdfText = fullEmailBody.substring(fullEmailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
     console.log('[PO Extract] PDF section length:', pdfText.length)
+    console.log('[PO Extract] First 300 chars:', pdfText.substring(0, 300))
 
     // Step 2: Try patterns in order of reliability
     const patterns = [
@@ -44,10 +45,11 @@ function extractPONumber(fullEmailBody: string): string {
         /\b([A-Z]{2,}[0-9]{4,8})\b/,
 
         // Pattern 4: Standalone numbers 6-10 digits (avoid dates by limiting to 10 max)
-        /\b([0-9]{6,10})\b/
+        /\b([56][0-9]{5,9})\b/  // Must start with 5 or 6 (typical PO prefixes)
     ]
 
     for (let i = 0; i < patterns.length; i++) {
+        console.log(`[PO Extract] Testing pattern ${i + 1}...`)
         const match = pdfText.match(patterns[i])
         if (match && match[1]) {
             const po = match[1].trim()
@@ -58,8 +60,16 @@ function extractPONumber(fullEmailBody: string): string {
                 continue
             }
 
+            // Skip if it looks like a phone number
+            if (/^(44|07|01|02|03)[0-9]{8,}/.test(po)) {
+                console.log(`[PO Extract] ⏭️  Pattern ${i + 1} skipped "${po}" (looks like phone number)`)
+                continue
+            }
+
             console.log(`[PO Extract] ✅ Pattern ${i + 1} found: "${po}"`)
             return po
+        } else {
+            console.log(`[PO Extract] Pattern ${i + 1} - no match`)
         }
     }
 
