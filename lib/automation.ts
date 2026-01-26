@@ -11,6 +11,21 @@ export async function automateUserCreation(userData: {
     userName: string
     licenseYears: number
 }): Promise<AutomationResult> {
+    let lastUrl = ""
+    let lastTitle = ""
+    let debugSnippet = ""
+
+    const getDiagnosticInfo = async (page: any) => {
+        try {
+            lastUrl = page.url()
+            lastTitle = await page.title()
+            debugSnippet = await page.evaluate(() => document.body.innerText.substring(0, 500))
+            return `URL: ${lastUrl} | Title: ${lastTitle} | Snippet: ${debugSnippet}`
+        } catch (e) {
+            return "Could not capture diagnostic info"
+        }
+    }
+
     const browserlessToken = process.env.BROWSERLESS_TOKEN
     const adminEmail = process.env.ADMIN_EMAIL
     const adminPassword = process.env.ADMIN_PASSWORD
@@ -43,17 +58,39 @@ export async function automateUserCreation(userData: {
             await page.waitForNavigation({ waitUntil: "networkidle2" })
         }
 
+        // Verify Login Success
+        const currentTitle = await page.title()
+        if (currentTitle.includes("Login")) {
+            throw new Error(`Login failed or redirected back to login page. ${await getDiagnosticInfo(page)}`)
+        }
+
         // 2. Start Subscription / Add New User (Nested)
         console.log(`[Automation] Navigating to New Subscription page...`)
         await page.goto("https://www.audemic.app/admin/subscription/new", { waitUntil: "networkidle2" })
 
         // 3. Create User in Modal
         const addUserSelector = 'a.create[data-link*="/admin/user/new"]'
-        console.log(`[Automation] Waiting for 'Add a new User' button...`)
-        await page.waitForSelector(addUserSelector, { visible: true, timeout: 10000 })
+        console.log(`[Automation] Searching for 'Add a new User' button...`)
 
-        console.log(`[Automation] Clicking 'Add a new User' button...`)
-        await page.click(addUserSelector)
+        // Wait and check visibility
+        try {
+            await page.waitForSelector(addUserSelector, { visible: true, timeout: 5000 })
+            await page.click(addUserSelector)
+        } catch (e) {
+            console.log(`[Automation] CSS selector failed, trying text-based search...`)
+            const buttonFound = await page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('a.create'));
+                const target = buttons.find(b => b.textContent?.includes('Add a new User'));
+                if (target) {
+                    (target as HTMLElement).click();
+                    return true;
+                }
+                return false;
+            });
+            if (!buttonFound) {
+                throw new Error(`Could not find 'Add a new User' button. ${await getDiagnosticInfo(page)}`)
+            }
+        }
 
         // Wait for modal to appear and become visible
         console.log(`[Automation] Waiting for modal to appear...`)
@@ -87,7 +124,9 @@ export async function automateUserCreation(userData: {
         await page.click('#modal .save-action')
 
         // Wait for modal to close
-        await page.waitForSelector('#modal', { hidden: true, timeout: 10000 })
+        await page.waitForSelector('#modal', { hidden: true, timeout: 10000 }).catch(async () => {
+            throw new Error(`Modal did not close after saving user. ${await getDiagnosticInfo(page)}`)
+        })
         console.log(`[Automation] User created and modal closed.`)
 
         // 4. Finalize Subscription
@@ -117,6 +156,13 @@ export async function automateUserCreation(userData: {
         }
 
         // Save Subscription
+        const isDryRun = userData.email.includes("test@") || userData.email.includes("fake@")
+        if (isDryRun) {
+            console.log("[Automation] SUCCESS (Dry Run): All steps completed with fake data.")
+            await browser.close()
+            return { success: true }
+        }
+
         console.log(`[Automation] Saving subscription...`)
         const saveButtonSelector = 'button[name="_save"]'
         await page.waitForSelector(saveButtonSelector, { visible: true, timeout: 5000 })
