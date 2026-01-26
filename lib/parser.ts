@@ -240,15 +240,33 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
                 // ALWAYS use proximity-based name extraction (more reliable than AI)
                 console.log('[Parser] Using proximity extraction for student name...')
-                const extractedName = extractStudentName(emailBody, parsed.userEmail)
+                console.log('[Parser] AI extracted email:', parsed.userEmail)
+
+                let extractedName = extractStudentName(emailBody, parsed.userEmail)
+
+                // If that failed, try to find a personal email in the body and extract name near that
+                if (!extractedName) {
+                    console.log('[Parser] Primary extraction failed, trying fallback...')
+                    // Find any personal email (gmail, hotmail, icloud, etc.) in the body before PDF
+                    const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
+                        ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
+                        : emailBody
+                    const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
+                    if (personalEmailMatch) {
+                        console.log('[Parser] Found personal email in body:', personalEmailMatch[0])
+                        extractedName = extractStudentName(emailBody, personalEmailMatch[0])
+                    }
+                }
+
+                // Final assignment
                 if (extractedName) {
                     parsed.userName = extractedName
-                    // Parse first/last name
                     const nameParts = extractedName.split(/\s+/)
                     parsed.firstName = nameParts[0]
                     parsed.lastName = nameParts.slice(1).join(' ') || nameParts[0]
-                } else if (!parsed.userName || parsed.userName.includes('PDF') || parsed.userName.includes('ATTACHMENT')) {
-                    console.warn('[Parser] ⚠️  Name extraction failed or invalid AI result')
+                    console.log('[Parser] ✅ Final name:', extractedName)
+                } else {
+                    console.warn('[Parser] ⚠️  Name extraction failed completely')
                     parsed.userName = "⚠️ Name Not Found"
                 }
 
@@ -286,14 +304,31 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
                 // ALWAYS use proximity-based name extraction
                 console.log('[Parser] Using proximity extraction for student name...')
-                const extractedName = extractStudentName(emailBody, parsed.userEmail)
+                console.log('[Parser] AI extracted email:', parsed.userEmail)
+
+                let extractedName = extractStudentName(emailBody, parsed.userEmail)
+
+                // If that failed, try to find a personal email in the body
+                if (!extractedName) {
+                    console.log('[Parser] Primary extraction failed, trying fallback...')
+                    const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
+                        ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
+                        : emailBody
+                    const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
+                    if (personalEmailMatch) {
+                        console.log('[Parser] Found personal email in body:', personalEmailMatch[0])
+                        extractedName = extractStudentName(emailBody, personalEmailMatch[0])
+                    }
+                }
+
                 if (extractedName) {
                     parsed.userName = extractedName
                     const nameParts = extractedName.split(/\s+/)
                     parsed.firstName = nameParts[0]
                     parsed.lastName = nameParts.slice(1).join(' ') || nameParts[0]
-                } else if (!parsed.userName || parsed.userName.includes('PDF') || parsed.userName.includes('ATTACHMENT')) {
-                    console.warn('[Parser] ⚠️  Name extraction failed or invalid AI result')
+                    console.log('[Parser] ✅ Final name:', extractedName)
+                } else {
+                    console.warn('[Parser] ⚠️  Name extraction failed completely')
                     parsed.userName = "⚠️ Name Not Found"
                 }
 
