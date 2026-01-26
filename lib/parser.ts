@@ -210,7 +210,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     return parsed as ParsedRequest
 }
 
-function fallbackParse(body: string, subject: string, senderEmail: string, provider: ParsedRequest['provider']): ParsedRequest {
+async function fallbackParse(body: string, subject: string, senderEmail: string, provider: ParsedRequest['provider']): Promise<ParsedRequest> {
     // This is essentially redundant now as parseEmailWithAI has internal fallbacks, 
     // but we keep the signature for compatibility.
     return parseEmailWithAI(body, subject, senderEmail)
