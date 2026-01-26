@@ -59,6 +59,20 @@ function extractPONumber(fullEmailBody: string, subject: string = ""): string {
 }
 
 /**
+ * Extracts license years from email body
+ */
+function extractLicenseYears(body: string): number {
+    const text = body.toLowerCase()
+
+    if (text.includes("4 year") || text.includes("four year")) return 4
+    if (text.includes("3 year") || text.includes("three year")) return 3
+    if (text.includes("2 year") || text.includes("two year")) return 2
+
+    // Default to 1
+    return 1
+}
+
+/**
  * Robust Student Name Extractor
  */
 function extractStudentName(emailBody: string, studentEmail: string): string {
@@ -203,6 +217,10 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
     // Final cleanups
     parsed.provider = identifiedProvider
+
+    // Use robust license years extraction to override or confirm AI result
+    parsed.licenseYears = extractLicenseYears(emailBody)
+
     const parts = parsed.userName.split(' ')
     parsed.firstName = parts[0]
     parsed.lastName = parts.slice(1).join(' ') || parts[0]
