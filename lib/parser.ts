@@ -187,6 +187,8 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 }
 
 function fallbackParse(body: string, subject: string, senderEmail: string, provider: ParsedRequest['provider']): ParsedRequest {
+    console.log('[Fallback Parser] AI parsing failed, using fallback...')
+
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
     const emails = body.match(emailRegex) || []
     const senderAddress = senderEmail.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || ""
@@ -201,6 +203,6 @@ function fallbackParse(body: string, subject: string, senderEmail: string, provi
         userName: nameMatch ? nameMatch[0] : "Unknown User",
         userEmail: studentEmail,
         licenseYears: bodyLower.includes("3 year") ? 3 : bodyLower.includes("2 year") ? 2 : bodyLower.includes("4 year") ? 4 : 1,
-        poNumber: body.match(/PO\d+|[0-9]{5,}/)?.[0] || "",
+        poNumber: extractPONumber(body) || "⚠️ NOT FOUND",
     }
 }
