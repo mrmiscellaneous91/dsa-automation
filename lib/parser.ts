@@ -128,30 +128,55 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     console.log('[Name Extract] Text before email (last 100 chars):', textBeforeEmail.substring(Math.max(0, textBeforeEmail.length - 100)))
 
     // Look for name patterns in the text before email
-    // Pattern 1: Standard capitalized name (e.g., "Amal Ahmed", "John Smith")
-    const namePattern1 = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g
-    const matches1 = [...textBeforeEmail.matchAll(namePattern1)]
+    // First, normalize the text - replace multiple whitespace with single space
+    const normalizedText = textBeforeEmail.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ')
+    console.log('[Name Extract] Normalized text:', normalizedText)
+
+    // Pattern 1: Standard capitalized name (2-5 words, letters only)
+    const namePattern1 = /([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,4})/g
+    const matches1 = [...normalizedText.matchAll(namePattern1)]
 
     // Pattern 2: ALL CAPS name (e.g., "AMAL AHMED")
-    const namePattern2 = /([A-Z]{2,}\s+[A-Z]{2,}(?:\s+[A-Z]{2,})?)/g
-    const matches2 = [...textBeforeEmail.matchAll(namePattern2)]
+    const namePattern2 = /([A-Z]{2,}(?:\s[A-Z]{2,}){1,3})/g
+    const matches2 = [...normalizedText.matchAll(namePattern2)]
 
-    // Get the last match (closest to email) from either pattern
-    const allMatches = [...matches1, ...matches2]
-    console.log('[Name Extract] Found', allMatches.length, 'potential names')
+    // Get all matches as strings
+    const allMatches = [...matches1.map(m => m[1]), ...matches2.map(m => m[1])]
+    console.log('[Name Extract] Found', allMatches.length, 'potential names:', allMatches)
 
-    if (allMatches.length > 0) {
-        const lastMatch = allMatches[allMatches.length - 1][1].trim()
+    // Filter out common labels/false positives
+    const invalidPatterns = [
+        'Student Name', 'Student Email', 'User Name', 'End User',
+        'Operations Manager', 'Procurement', 'Best Regards', 'Kind Regards',
+        'Good Morning', 'Good Afternoon', 'Hello Joshua', 'Dear Joshua',
+        'Audemic Licence', 'Audemic Scholar', 'Please Joshua', 'Joshua Please'
+    ]
 
-        // Filter out common false positives
-        const invalidPatterns = ['PDF', 'ATTACHMENT', 'PURCHASE', 'ORDER', 'CONTENT', 'EMAIL', 'YEAR']
-        if (invalidPatterns.some(invalid => lastMatch.toUpperCase().includes(invalid))) {
-            console.log('[Name Extract] ⏭️  Rejected:', lastMatch, '(common false positive)')
-            return ""
-        }
+    const validMatches = allMatches
+        .map(match => {
+            // Clean up: remove trailing "Student" or "Student Email" or "Email"
+            return match
+                .replace(/\s+Student\s+Email$/i, '')
+                .replace(/\s+Student$/i, '')
+                .replace(/\s+Email$/i, '')
+                .trim()
+        })
+        .filter(match => {
+            const upper = match.toUpperCase()
+            // Names should usually be 2+ words and not be one of the labels
+            const wordCount = match.split(/\s+/).length
+            if (wordCount < 2) return false
 
-        console.log('[Name Extract] ✅ Found name:', lastMatch)
-        return lastMatch
+            return !invalidPatterns.some(invalid => upper.includes(invalid.toUpperCase()))
+        })
+
+    console.log('[Name Extract] Valid matches after filtering:', validMatches)
+
+    if (validMatches.length > 0) {
+        // Pick the LONGEST match (actual names are usually longer than false positives)
+        const longestMatch = validMatches.reduce((a, b) => a.length > b.length ? a : b)
+        console.log('[Name Extract] ✅ Found name:', longestMatch)
+        return longestMatch
     }
 
     console.log('[Name Extract] ❌ No name pattern found')
