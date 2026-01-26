@@ -87,21 +87,34 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     else if (senderLower.includes("as-dsa.com") || senderLower.includes("unleashedsoftware.com")) identifiedProvider = "Assistive"
 
     const prompt = `
-    Extract student license details from this DSA provider email.
+    You are extracting student information from a DSA provider email.
     
-    PROVIDER: ${identifiedProvider}
+    IMPORTANT: This email has TWO sections:
+    1. EMAIL BODY - contains student name and email
+    2. [PDF ATTACHMENT CONTENT] - contains order details (ignore this section for name extraction)
     
-    Extract ONLY:
-    1. STUDENT NAME - usually in ALL CAPS near their email (e.g. "AMAL AHMED")
-    2. STUDENT EMAIL - student's personal email (NOT the provider's email)
-    3. LICENSE YEARS - look for "3 year" or "three year" (default is 1)
+    TASK: Extract the following from the EMAIL BODY section ONLY (the part BEFORE "[PDF ATTACHMENT CONTENT]"):
     
-    DO NOT extract PO number - leave it empty.
+    1. STUDENT NAME: 
+       - Find the name that appears near the student's email address
+       - It's often in format: "Amal Ahmed" or "AMAL AHMED" 
+       - This is usually 1-2 lines BEFORE the email address
+       - DO NOT use "PDF ATTACHMENT CONTENT" as a name
+       - DO NOT use the provider contact's name (${senderEmail})
+    
+    2. STUDENT EMAIL:
+       - Personal email address (gmail, hotmail, outlook, university, etc.)
+       - NOT the provider's email (${senderEmail})
+    
+    3. LICENSE YEARS:
+       - Look for "3 year" or "three year" → return 3
+       - Look for "2 year" → return 2
+       - Default → return 1
     
     EMAIL CONTENT:
     ${emailBody}
     
-    Return JSON:
+    Return ONLY valid JSON (no markdown):
     {
       "provider": "${identifiedProvider}",
       "providerContact": "Sender first name",
@@ -189,18 +202,30 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 function fallbackParse(body: string, subject: string, senderEmail: string, provider: ParsedRequest['provider']): ParsedRequest {
     console.log('[Fallback Parser] AI parsing failed, using fallback...')
 
+    // Extract only email body (before PDF section) for name extraction
+    const emailBodyOnly = body.includes('[PDF ATTACHMENT CONTENT]')
+        ? body.substring(0, body.indexOf('[PDF ATTACHMENT CONTENT]'))
+        : body
+
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
     const emails = body.match(emailRegex) || []
     const senderAddress = senderEmail.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || ""
     const studentEmail = emails.find(e => e.toLowerCase() !== senderAddress.toLowerCase()) || emails[0] || ""
-    const nameMatch = body.match(/[A-Z]{2,}\s[A-Z]{2,}(\s[A-Z]{2,})?/)
+
+    // Look for name in email body only, exclude common non-names
+    const nameMatch = emailBodyOnly.match(/[A-Z]{2,}\s[A-Z]{2,}(\s[A-Z]{2,})?/)
+    const extractedName = nameMatch ? nameMatch[0] : ""
+
+    // Filter out common false positives
+    const invalidNames = ['PDF ATTACHMENT', 'ATTACHMENT CONTENT', 'PURCHASE ORDER']
+    const isValidName = extractedName && !invalidNames.some(invalid => extractedName.includes(invalid))
 
     const bodyLower = body.toLowerCase()
 
     return {
         provider,
         providerContact: "Team",
-        userName: nameMatch ? nameMatch[0] : "Unknown User",
+        userName: isValidName ? extractedName : "⚠️ Name Not Found",
         userEmail: studentEmail,
         licenseYears: bodyLower.includes("3 year") ? 3 : bodyLower.includes("2 year") ? 2 : bodyLower.includes("4 year") ? 4 : 1,
         poNumber: extractPONumber(body) || "⚠️ NOT FOUND",
