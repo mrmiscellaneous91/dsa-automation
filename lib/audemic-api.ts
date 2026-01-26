@@ -41,8 +41,18 @@ export async function createAudemicUser(userData: UserData): Promise<CreateUserR
         })
 
         if (!createResponse.ok) {
-            const errorText = await createResponse.text()
-            return { success: false, error: `Failed to create user: ${createResponse.status} - ${errorText}` }
+            let errorMessage = `HTTP ${createResponse.status}`
+            try {
+                const errorData = await createResponse.json()
+                errorMessage = errorData.message || errorData.error || errorData.errors?.join(", ") || JSON.stringify(errorData)
+            } catch (e) {
+                // Not JSON, try to get text snippet
+                try {
+                    const text = await createResponse.text()
+                    errorMessage = text.substring(0, 200)
+                } catch (e2) { /* ignore */ }
+            }
+            return { success: false, error: `Failed to create user: ${errorMessage}` }
         }
 
         const createData = await createResponse.json()
