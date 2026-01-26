@@ -94,15 +94,24 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     console.log('[Name Extract] Looking for name near email:', studentEmail)
     console.log('[Name Extract] Body length:', bodyOnly.length)
 
-    // Find the email in the body
-    let emailIndex = bodyOnly.indexOf(studentEmail)
+    // Find the email in the body (case-insensitive)
+    const normalizedBody = bodyOnly.toLowerCase()
+    const searchEmail = studentEmail.toLowerCase()
+    let emailIndex = normalizedBody.indexOf(searchEmail)
 
     // If exact email not found, try finding without the mailto wrapper
-    if (emailIndex === -1 && studentEmail.includes('@')) {
-        const emailPart = studentEmail.split('<')[0].trim()
-        emailIndex = bodyOnly.indexOf(emailPart)
-        if (emailIndex !== -1) {
-            console.log('[Name Extract] Found email variant:', emailPart)
+    if (emailIndex === -1 && searchEmail.includes('@')) {
+        const emailPart = searchEmail.split('<')[0].trim()
+        emailIndex = normalizedBody.indexOf(emailPart)
+    }
+
+    if (emailIndex === -1) {
+        console.log('[Name Extract] Email not found in body, trying fallback patterns...')
+        // Fallback: just find any personal email and look near that
+        const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
+        if (personalEmailMatch) {
+            console.log('[Name Extract] Fallback to found personal email:', personalEmailMatch[0])
+            emailIndex = normalizedBody.indexOf(personalEmailMatch[0].toLowerCase())
         }
     }
 
@@ -124,20 +133,18 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     }
 
     // Get text before the email (usually contains the name)
-    const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 200), emailIndex)
-    console.log('[Name Extract] Text before email (last 100 chars):', textBeforeEmail.substring(Math.max(0, textBeforeEmail.length - 100)))
+    const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 250), emailIndex)
 
-    // Look for name patterns in the text before email
-    // First, normalize the text - replace multiple whitespace with single space
-    const normalizedText = textBeforeEmail.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ')
-    console.log('[Name Extract] Normalized text:', normalizedText)
+    // Normalize text - replace newlines and Unicode spaces with spaces
+    const normalizedText = textBeforeEmail.replace(/[\r\n\t\u2000-\u200B]+/g, ' ').replace(/\s+/g, ' ')
+    console.log('[Name Extract] Normalized text sample:', normalizedText.slice(-100))
 
-    // Pattern 1: Standard capitalized name (2-5 words, letters only)
-    const namePattern1 = /([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,4})/g
+    // Pattern 1: Standard capitalized name (2-6 words, allowing hyphens and apostrophes)
+    const namePattern1 = /\b([A-Z][A-Za-z'-]+(?:\s[A-Z][A-Za-z'-]+)+)\b/g
     const matches1 = [...normalizedText.matchAll(namePattern1)]
 
     // Pattern 2: ALL CAPS name (e.g., "AMAL AHMED")
-    const namePattern2 = /([A-Z]{2,}(?:\s[A-Z]{2,}){1,3})/g
+    const namePattern2 = /\b([A-Z]{2,}(?:\s[A-Z]{2,})+)\b/g
     const matches2 = [...normalizedText.matchAll(namePattern2)]
 
     // Get all matches as strings
@@ -173,10 +180,10 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     console.log('[Name Extract] Valid matches after filtering:', validMatches)
 
     if (validMatches.length > 0) {
-        // Pick the LONGEST match (actual names are usually longer than false positives)
-        const longestMatch = validMatches.reduce((a, b) => a.length > b.length ? a : b)
-        console.log('[Name Extract] ✅ Found name:', longestMatch)
-        return longestMatch
+        // Pick the match closest to the email (the last match in textBeforeEmail)
+        const bestMatch = validMatches[validMatches.length - 1]
+        console.log('[Name Extract] ✅ Found name:', bestMatch)
+        return bestMatch
     }
 
     console.log('[Name Extract] ❌ No name pattern found')

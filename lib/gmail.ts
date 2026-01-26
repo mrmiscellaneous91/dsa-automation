@@ -51,16 +51,44 @@ export async function sendEmail(gmail: any, to: string, subject: string, body: s
 
 export function extractEmailContent(payload: any) {
     let body = ""
+
+    // Helper to strip HTML tags if we only have HTML
+    const stripHtml = (html: string) => {
+        return html
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+    }
+
     if (payload.parts) {
+        // First pass: look for plain text
         for (const part of payload.parts) {
-            if (part.mimeType === "text/plain") {
+            if (part.mimeType === "text/plain" && part.body?.data) {
                 body += Buffer.from(part.body.data, "base64").toString()
             } else if (part.parts) {
                 body += extractEmailContent(part)
             }
         }
-    } else if (payload.body.data) {
-        body = Buffer.from(payload.body.data, "base64").toString()
+
+        // Second pass: if no plain text found, look for HTML
+        if (!body) {
+            for (const part of payload.parts) {
+                if (part.mimeType === "text/html" && part.body?.data) {
+                    const html = Buffer.from(part.body.data, "base64").toString()
+                    body += stripHtml(html)
+                }
+            }
+        }
+    } else if (payload.body?.data) {
+        const content = Buffer.from(payload.body.data, "base64").toString()
+        if (payload.mimeType === "text/html") {
+            body = stripHtml(content)
+        } else {
+            body = content
+        }
     }
     return body
 }
