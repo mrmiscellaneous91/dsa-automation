@@ -97,17 +97,28 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     // Find the email in the body (case-insensitive)
     const normalizedBody = bodyOnly.toLowerCase()
     const searchEmail = studentEmail.toLowerCase()
-    let emailIndex = normalizedBody.indexOf(searchEmail)
+    let emailIndex = -1
 
-    // If exact email not found, try finding without the mailto wrapper
-    if (emailIndex === -1 && searchEmail.includes('@')) {
-        const emailPart = searchEmail.split('<')[0].trim()
-        emailIndex = normalizedBody.indexOf(emailPart)
+    // Try to find the most "email-like" part of searchEmail to use as anchor
+    let anchor = ""
+    if (searchEmail.includes('<') && searchEmail.includes('>')) {
+        const match = searchEmail.match(/<([^>]+)>/)
+        if (match) anchor = match[1].trim()
+    } else if (searchEmail.includes('@') && !searchEmail.includes(' ')) {
+        anchor = searchEmail
+    } else if (searchEmail.includes('@')) {
+        const match = searchEmail.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/)
+        if (match) anchor = match[1]
     }
 
+    if (anchor) {
+        console.log('[Name Extract] Using anchor for search:', anchor)
+        emailIndex = normalizedBody.indexOf(anchor.toLowerCase())
+    }
+
+    // Fallback: if no anchor match, try finding ANY personal email in the body
     if (emailIndex === -1) {
-        console.log('[Name Extract] Email not found in body, trying fallback patterns...')
-        // Fallback: just find any personal email and look near that
+        console.log('[Name Extract] No anchor match, trying fallback to find any personal email...')
         const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
         if (personalEmailMatch) {
             console.log('[Name Extract] Fallback to found personal email:', personalEmailMatch[0])
@@ -116,19 +127,7 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
     }
 
     if (emailIndex === -1) {
-        console.log('[Name Extract] Email not found in body, trying fallback to find any name pattern...')
-        // Fallback: just find any name in the body
-        const namePattern = /([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/
-        const match = bodyOnly.match(namePattern)
-        if (match) {
-            const name = match[1].trim()
-            const invalidPatterns = ['PDF', 'ATTACHMENT', 'PURCHASE', 'ORDER', 'CONTENT', 'EMAIL', 'YEAR', 'Vicki', 'Operations', 'Manager']
-            if (!invalidPatterns.some(invalid => name.includes(invalid))) {
-                console.log('[Name Extract] ✅ Fallback found name:', name)
-                return name
-            }
-        }
-        console.log('[Name Extract] ❌ No valid name found in fallback')
+        console.log('[Name Extract] No anchor point found in body for name extraction')
         return ""
     }
 
@@ -161,18 +160,25 @@ function extractStudentName(emailBody: string, studentEmail: string): string {
 
     const validMatches = allMatches
         .map(match => {
-            // Clean up: remove trailing "Student" or "Student Email" or "Email"
-            return match
-                .replace(/\s+Student\s+Email$/i, '')
-                .replace(/\s+Student$/i, '')
-                .replace(/\s+Email$/i, '')
-                .trim()
+            // Clean up: aggressively remove trailing labels that might have been captured
+            let cleaned = match.trim()
+            const labelPattern = /\s+(Student|Email|User|Status|Name|Licence|Scholar|Dear|Hello|Best|Regards|Morning|Afternoon|Joshua)$/i
+
+            // Run up to 3 times to catch "Student Email Name" etc.
+            for (let i = 0; i < 3; i++) {
+                if (labelPattern.test(cleaned)) {
+                    cleaned = cleaned.replace(labelPattern, '').trim()
+                } else {
+                    break
+                }
+            }
+            return cleaned
         })
         .filter(match => {
             const upper = match.toUpperCase()
-            // Names should usually be 2+ words and not be one of the labels
+            // Names should usually be 2-6 words
             const wordCount = match.split(/\s+/).length
-            if (wordCount < 2) return false
+            if (wordCount < 2 || wordCount > 6) return false
 
             return !invalidPatterns.some(invalid => upper.includes(invalid.toUpperCase()))
         })
@@ -387,16 +393,8 @@ function fallbackParse(body: string, subject: string, senderEmail: string, provi
     const senderAddress = senderEmail.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] || ""
     const studentEmail = emails.find(e => e.toLowerCase() !== senderAddress.toLowerCase()) || emails[0] || ""
 
-    // Look for name in email body only, exclude common non-names
-    const nameMatch = emailBodyOnly.match(/[A-Z]{2,}\s[A-Z]{2,}(\s[A-Z]{2,})?/)
-    const extractedName = nameMatch ? nameMatch[0] : ""
-
-    // Filter out common false positives
-    const invalidNames = ['PDF ATTACHMENT', 'ATTACHMENT CONTENT', 'PURCHASE ORDER']
-    const isValidName = extractedName && !invalidNames.some(invalid => extractedName.includes(invalid))
-
-    const studentName = isValidName ? extractedName : "⚠️ Name Not Found"
-    const nameParts = isValidName ? extractedName.split(/\s+/) : []
+    const studentName = extractStudentName(body, studentEmail) || "⚠️ Name Not Found"
+    const nameParts = studentName.includes('⚠️') ? [] : studentName.split(/\s+/)
 
     const bodyLower = body.toLowerCase()
 

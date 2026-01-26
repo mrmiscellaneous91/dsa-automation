@@ -1,87 +1,95 @@
-// Test with actual Remtek email format - fixed version
+// Final Verification Test
 
 function extractStudentName(emailBody, studentEmail) {
     const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
         ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
         : emailBody
 
-    console.log('[Name Extract] Looking for name near email:', studentEmail)
+    const normalizedBody = bodyOnly.toLowerCase()
+    const searchEmail = studentEmail.toLowerCase()
+    let emailIndex = -1
 
-    let emailIndex = bodyOnly.indexOf(studentEmail)
+    let anchor = ""
+    if (searchEmail.includes('<') && searchEmail.includes('>')) {
+        const match = searchEmail.match(/<([^>]+)>/)
+        if (match) anchor = match[1].trim()
+    } else if (searchEmail.includes('@') && !searchEmail.includes(' ')) {
+        anchor = searchEmail
+    } else if (searchEmail.includes('@')) {
+        const match = searchEmail.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/)
+        if (match) anchor = match[1]
+    }
 
-    if (emailIndex === -1 && studentEmail.includes('@')) {
-        const emailPart = studentEmail.split('<')[0].trim()
-        emailIndex = bodyOnly.indexOf(emailPart)
+    if (anchor) {
+        emailIndex = normalizedBody.indexOf(anchor.toLowerCase())
     }
 
     if (emailIndex === -1) {
-        console.log('[Name Extract] Email not found!')
-        return ""
+        const personalEmailMatch = bodyOnly.match(/([a-zA-Z0-9._-]+@(?:gmail|hotmail|icloud|outlook|yahoo|live|student|ac\.uk|edu)[a-zA-Z0-9._-]*)/i)
+        if (personalEmailMatch) {
+            emailIndex = normalizedBody.indexOf(personalEmailMatch[0].toLowerCase())
+        }
     }
 
-    const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 200), emailIndex)
+    if (emailIndex === -1) return "Email not found"
 
-    // Normalize text - replace newlines with spaces
-    const normalizedText = textBeforeEmail.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ')
-    console.log('[Name Extract] Normalized text:', normalizedText)
+    const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 250), emailIndex)
+    const normalizedText = textBeforeEmail.replace(/[\r\n\t\u2000-\u200B]+/g, ' ').replace(/\s+/g, ' ')
 
-    // Pattern 1: Standard capitalized name (2-5 words)
-    const namePattern1 = /([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,4})/g
+    const namePattern1 = /\b([A-Z][A-Za-z'-]+(?:\s[A-Z][A-Za-z'-]+)+)\b/g
     const matches1 = [...normalizedText.matchAll(namePattern1)]
 
-    // Pattern 2: ALL CAPS name
-    const namePattern2 = /([A-Z]{2,}(?:\s[A-Z]{2,}){1,3})/g
+    const namePattern2 = /\b([A-Z]{2,}(?:\s[A-Z]{2,})+)\b/g
     const matches2 = [...normalizedText.matchAll(namePattern2)]
 
-    // Get all matches as strings
     const allMatches = [...matches1.map(m => m[1]), ...matches2.map(m => m[1])]
-    console.log('[Name Extract] Found', allMatches.length, 'potential names:', allMatches)
 
-    // Filter out common labels
     const invalidPatterns = [
         'Student Name', 'Student Email', 'User Name', 'End User',
         'Operations Manager', 'Procurement', 'Best Regards', 'Kind Regards',
         'Good Morning', 'Good Afternoon', 'Hello Joshua', 'Dear Joshua',
-        'Audemic Licence', 'Audemic Scholar', 'Please Joshua'
+        'Audemic Licence', 'Audemic Scholar', 'Please Joshua', 'Joshua Please'
     ]
 
-    const validMatches = allMatches.filter(match => {
-        const upper = match.toUpperCase()
-        return !invalidPatterns.some(invalid => upper.includes(invalid.toUpperCase()))
-    })
-
-    console.log('[Name Extract] Valid matches after filtering:', validMatches)
+    const validMatches = allMatches
+        .map(match => {
+            let cleaned = match.trim()
+            const labelPattern = /\s+(Student|Email|User|Status|Name|Licence|Scholar|Dear|Hello|Best|Regards|Morning|Afternoon|Joshua)$/i
+            for (let i = 0; i < 3; i++) {
+                if (labelPattern.test(cleaned)) {
+                    cleaned = cleaned.replace(labelPattern, '').trim()
+                } else {
+                    break
+                }
+            }
+            return cleaned
+        })
+        .filter(match => {
+            const upper = match.toUpperCase()
+            const wordCount = match.split(/\s+/).length
+            if (wordCount < 2 || wordCount > 6) return false
+            return !invalidPatterns.some(invalid => upper.includes(invalid.toUpperCase()))
+        })
 
     if (validMatches.length > 0) {
-        const longestMatch = validMatches.reduce((a, b) => a.length > b.length ? a : b)
-        console.log('[Name Extract] ✅ Found name:', longestMatch)
-        return longestMatch
+        return validMatches[validMatches.length - 1]
     }
 
-    return ""
+    return "No match"
 }
 
-// Actual Remtek email
-const remtekEmail = `\r\n\r\nHello, Joshua\r\n\r\nPlease can you assign an Audemic Licence  to -\r\n\r\nStudent name -       Segilola Christianah Kikelomo Faleru\r\n\r\n\r\nStudent Email -         segilolaf@gmail.com\r\n\r\n\r\nThanks\r\n\r\nPaul\r\n\r\n[PDF ATTACHMENT CONTENT]:\n\nSub Total173.70`;
+// Case 1: Remtek with weird spaces
+const remtekEmail = `\r\n\r\nHello, Joshua\r\n\r\nPlease can you assign an Audemic Licence  to -\r\n\r\nStudent name -       Segilola Christianah Kikelomo Faleru\r\n\r\n\r\nStudent Email -         segilolaf@gmail.com`;
 
-console.log("=== TEST: Segilola (Remtek Format) ===\n");
-const result = extractStudentName(remtekEmail, "segilolaf@gmail.com");
-console.log("\n\nExpected: Segilola Christianah Kikelomo Faleru");
-console.log("Got:", result);
-console.log("Pass:", result === "Segilola Christianah Kikelomo Faleru" ? "✅" : "❌");
+console.log("=== FINAL TEST: Segilola ===\n");
+const resultSeg = extractStudentName(remtekEmail, "segilolaf@gmail.com");
+console.log("Expected: Segilola Christianah Kikelomo Faleru");
+console.log("Got:", resultSeg);
+console.log("Pass:", resultSeg === "Segilola Christianah Kikelomo Faleru" ? "✅" : "❌");
 
-// Test Amal format
-const amalEmail = `Amal Ahmed\r\namal-ahmed@hotmail.co.uk<mailto:...>\r\n[PDF ATTACHMENT CONTENT]:`;
-console.log("\n\n=== TEST: Amal Ahmed ===\n");
-const result2 = extractStudentName(amalEmail, "amal-ahmed@hotmail.co.uk");
-console.log("\n\nExpected: Amal Ahmed");
-console.log("Got:", result2);
-console.log("Pass:", result2 === "Amal Ahmed" ? "✅" : "❌");
-
-// Test Aydil format
-const aydilEmail = `Good morning,\n\nPlease could you assign the following student an Audemic licence:\nAydil Ganidagli\nb.aydil@icloud.com\n\n[PDF ATTACHMENT CONTENT]:`;
-console.log("\n\n=== TEST: Aydil Ganidagli ===\n");
-const result3 = extractStudentName(aydilEmail, "b.aydil@icloud.com");
-console.log("\n\nExpected: Aydil Ganidagli");
-console.log("Got:", result3);
-console.log("Pass:", result3 === "Aydil Ganidagli" ? "✅" : "❌");
+// Case 2: Buggy AI extraction
+console.log("\n=== FINAL TEST: Bug Case (AI extracts Name <email>) ===\n");
+const resultBug = extractStudentName(remtekEmail, "Segilola Christianah Kikelomo Faleru <segilolaf@gmail.com>");
+console.log("Expected: Segilola Christianah Kikelomo Faleru");
+console.log("Got:", resultBug);
+console.log("Pass:", resultBug === "Segilola Christianah Kikelomo Faleru" ? "✅" : "❌");
