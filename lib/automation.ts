@@ -49,8 +49,8 @@ export async function automateUserCreation(userData: {
 
         // 3. Create User in Modal
         console.log(`[Automation] Opening 'Add a new User' modal...`)
-        // The "+ Add a new User" button usually has class btn-info
-        await page.click('a.btn-info[data-link="/admin/user/new"]')
+        // The "+ Add a new User" button has data-link="/admin/user/new?modal=true"
+        await page.click('a.create[data-link*="/admin/user/new"]')
 
         // Wait for modal to appear and become visible
         await page.waitForSelector('#modal.show', { visible: true })
@@ -69,11 +69,9 @@ export async function automateUserCreation(userData: {
         // Set email_confirmed and active in modal if switches exist
         try {
             // Find switches within modal
-            const confirmedToggle = await page.$('#modal a[data-id="user_email_confirmed"]')
-            if (confirmedToggle) await confirmedToggle.click()
-
-            const activeToggle = await page.$('#modal a[data-id="user_active"]')
-            if (activeToggle) await activeToggle.click()
+            // rails_admin toggle labels or inputs
+            await page.click('#modal label[for="user_email_confirmed"] + div .btn-success').catch(() => { });
+            await page.click('#modal label[for="user_active"] + div .btn-success').catch(() => { });
         } catch (e) {
             console.log("[Automation] Error clicking toggles in modal, continuing...")
         }
@@ -102,9 +100,10 @@ export async function automateUserCreation(userData: {
 
         // Set Active to True on main form
         try {
-            await page.click('a[data-id="subscription_active"]')
+            await page.click('label[for="subscription_active"] + div .btn-success')
         } catch (e) {
-            console.log("[Automation] Could not toggle active on main form, continuing...")
+            console.log("[Automation] Could not toggle active on main form, trying generic toggle...")
+            await page.click('a[data-id="subscription_active"]').catch(() => { });
         }
 
         // Save Subscription
