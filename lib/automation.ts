@@ -48,13 +48,20 @@ export async function automateUserCreation(userData: {
         await page.goto("https://www.audemic.app/admin/subscription/new", { waitUntil: "networkidle2" })
 
         // 3. Create User in Modal
-        console.log(`[Automation] Opening 'Add a new User' modal...`)
-        // The "+ Add a new User" button has data-link="/admin/user/new?modal=true"
-        await page.click('a.create[data-link*="/admin/user/new"]')
+        const addUserSelector = 'a.create[data-link*="/admin/user/new"]'
+        console.log(`[Automation] Waiting for 'Add a new User' button...`)
+        await page.waitForSelector(addUserSelector, { visible: true, timeout: 10000 })
+
+        console.log(`[Automation] Clicking 'Add a new User' button...`)
+        await page.click(addUserSelector)
 
         // Wait for modal to appear and become visible
-        await page.waitForSelector('#modal.show', { visible: true })
-        console.log(`[Automation] Modal visible, filling user details...`)
+        console.log(`[Automation] Waiting for modal to appear...`)
+        await page.waitForSelector('#modal.show', { visible: true, timeout: 10000 })
+
+        // Wait for specific input inside modal to confirm it's ready
+        await page.waitForSelector('#modal input#user_email', { visible: true, timeout: 5000 })
+        console.log(`[Automation] Modal ready, filling user details...`)
 
         await page.type('#modal input#user_email', userData.email)
         await page.type('#modal input#user_password', "Audemic@123")
@@ -68,7 +75,7 @@ export async function automateUserCreation(userData: {
 
         // Set email_confirmed and active in modal if switches exist
         try {
-            // Find switches within modal
+            // Finding switches within modal
             // rails_admin toggle labels or inputs
             await page.click('#modal label[for="user_email_confirmed"] + div .btn-success').catch(() => { });
             await page.click('#modal label[for="user_active"] + div .btn-success').catch(() => { });
@@ -80,11 +87,14 @@ export async function automateUserCreation(userData: {
         await page.click('#modal .save-action')
 
         // Wait for modal to close
-        await page.waitForSelector('#modal', { hidden: true })
+        await page.waitForSelector('#modal', { hidden: true, timeout: 10000 })
         console.log(`[Automation] User created and modal closed.`)
 
         // 4. Finalize Subscription
         console.log(`[Automation] Filling subscription details...`)
+
+        // Ensure main form fields are visible
+        await page.waitForSelector('select#subscription_plan_type', { visible: true, timeout: 5000 })
 
         // Set Plan Type to Yearly
         await page.select('select#subscription_plan_type', 'yearly')
@@ -108,7 +118,9 @@ export async function automateUserCreation(userData: {
 
         // Save Subscription
         console.log(`[Automation] Saving subscription...`)
-        await page.click('button[name="_save"]')
+        const saveButtonSelector = 'button[name="_save"]'
+        await page.waitForSelector(saveButtonSelector, { visible: true, timeout: 5000 })
+        await page.click(saveButtonSelector)
         await page.waitForNavigation({ waitUntil: "networkidle2" })
 
         console.log("[Automation] Success: Nested User and Subscription created.")
