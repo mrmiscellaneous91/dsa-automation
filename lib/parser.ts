@@ -31,22 +31,33 @@ function extractPONumber(fullEmailBody: string): string {
     const pdfText = fullEmailBody.substring(fullEmailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
     console.log('[PO Extract] PDF section length:', pdfText.length)
 
-    // Step 2: Try simple patterns in order of reliability
+    // Step 2: Try patterns in order of reliability
     const patterns = [
-        // Pattern 1: "PURCHASE ORDER NO.: IPO51565" or "PO: 123456"
-        /(?:PURCHASE ORDER|ORDER NUMBER|ORDER NO|PO|P\.O\.)[^:]*:\s*([A-Z0-9]+)/i,
+        // Pattern 1: Labeled with colon "PURCHASE ORDER NO.: IPO51565" or "PO: 123456"
+        /(?:PURCHASE ORDER NO\.|PO NO\.|ORDER NO\.|PO|P\.O\.)\s*:\s*([A-Z0-9]{5,15})/i,
 
-        // Pattern 2: Standalone alphanumeric starting with letters (e.g., IPO51565)
-        /\b([A-Z]{2,}[0-9]{4,})\b/,
+        // Pattern 2: Remtek's concatenated format "PAGEPPO NUMBERPO Date\n1 / 150353502026"
+        // Extracts exactly 7-digit PO from format like "1 / 150353502026"
+        /PO NUMBER.*?[\s\n]+(?:[\d]+\s*\/\s*)?1([0-9]{7})20\d{2}/i,
 
-        // Pattern 3: Long standalone number (7+ digits)
-        /\b([0-9]{7,})\b/
+        // Pattern 3: Standalone alphanumeric codes (e.g., IPO51565)
+        /\b([A-Z]{2,}[0-9]{4,8})\b/,
+
+        // Pattern 4: Standalone numbers 6-10 digits (avoid dates by limiting to 10 max)
+        /\b([0-9]{6,10})\b/
     ]
 
     for (let i = 0; i < patterns.length; i++) {
         const match = pdfText.match(patterns[i])
         if (match && match[1]) {
             const po = match[1].trim()
+
+            // Skip if it looks like a date (contains typical date year like 2024-2026)
+            if (/^20[0-9]{6,}/.test(po)) {
+                console.log(`[PO Extract] ⏭️  Pattern ${i + 1} skipped "${po}" (looks like date)`)
+                continue
+            }
+
             console.log(`[PO Extract] ✅ Pattern ${i + 1} found: "${po}"`)
             return po
         }
