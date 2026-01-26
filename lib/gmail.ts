@@ -54,8 +54,16 @@ export function extractEmailContent(payload: any) {
     // Helper to decode Gmail's base64url format
     const decodeBase64 = (data: string) => {
         if (!data) return ""
+        // Replace base64url chars with base64 chars
         const base64 = data.replace(/-/g, '+').replace(/_/g, '/')
-        return Buffer.from(base64, "base64").toString()
+        // Add padding if needed
+        const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=')
+        try {
+            return Buffer.from(padded, "base64").toString()
+        } catch (e) {
+            console.error('[Gmail Extract] Decode error:', e)
+            return ""
+        }
     }
 
     // Helper to strip HTML tags if we only have HTML
