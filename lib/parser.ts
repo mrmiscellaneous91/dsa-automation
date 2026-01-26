@@ -77,6 +77,62 @@ function extractPONumber(fullEmailBody: string): string {
     return ""
 }
 
+/**
+ * Extract student name from email body by finding text near the student email
+ */
+function extractStudentName(emailBody: string, studentEmail: string): string {
+    if (!studentEmail) {
+        console.log('[Name Extract] No student email provided')
+        return ""
+    }
+
+    // Get only the email body section (before PDF)
+    const bodyOnly = emailBody.includes('[PDF ATTACHMENT CONTENT]')
+        ? emailBody.substring(0, emailBody.indexOf('[PDF ATTACHMENT CONTENT]'))
+        : emailBody
+
+    console.log('[Name Extract] Looking for name near email:', studentEmail)
+
+    // Find the email in the body
+    const emailIndex = bodyOnly.indexOf(studentEmail)
+    if (emailIndex === -1) {
+        console.log('[Name Extract] Student email not found in body')
+        return ""
+    }
+
+    // Get text before the email (usually contains the name)
+    const textBeforeEmail = bodyOnly.substring(Math.max(0, emailIndex - 200), emailIndex)
+    console.log('[Name Extract] Text before email:', textBeforeEmail.substring(textBeforeEmail.length - 100))
+
+    // Look for name patterns in the text before email
+    // Pattern 1: Standard capitalized name (e.g., "Amal Ahmed", "John Smith")
+    const namePattern1 = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g
+    const matches1 = [...textBeforeEmail.matchAll(namePattern1)]
+
+    // Pattern 2: ALL CAPS name (e.g., "AMAL AHMED")
+    const namePattern2 = /([A-Z]{2,}\s+[A-Z]{2,}(?:\s+[A-Z]{2,})?)/g
+    const matches2 = [...textBeforeEmail.matchAll(namePattern2)]
+
+    // Get the last match (closest to email) from either pattern
+    const allMatches = [...matches1, ...matches2]
+    if (allMatches.length > 0) {
+        const lastMatch = allMatches[allMatches.length - 1][1].trim()
+
+        // Filter out common false positives
+        const invalidPatterns = ['PDF', 'ATTACHMENT', 'PURCHASE', 'ORDER', 'CONTENT', 'EMAIL', 'YEAR']
+        if (invalidPatterns.some(invalid => lastMatch.toUpperCase().includes(invalid))) {
+            console.log('[Name Extract] ⏭️  Rejected:', lastMatch, '(common false positive)')
+            return ""
+        }
+
+        console.log('[Name Extract] ✅ Found name:', lastMatch)
+        return lastMatch
+    }
+
+    console.log('[Name Extract] ❌ No name pattern found')
+    return ""
+}
+
 export async function parseEmailWithAI(emailBody: string, subject: string, senderEmail: string): Promise<ParsedRequest> {
     const senderLower = senderEmail.toLowerCase()
     let identifiedProvider: ParsedRequest['provider'] = "Unknown"
@@ -157,6 +213,20 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                     parsed.poNumber = "⚠️ NOT FOUND"
                 }
 
+                // ALWAYS use proximity-based name extraction (more reliable than AI)
+                console.log('[Parser] Using proximity extraction for student name...')
+                const extractedName = extractStudentName(emailBody, parsed.userEmail)
+                if (extractedName) {
+                    parsed.userName = extractedName
+                    // Parse first/last name
+                    const nameParts = extractedName.split(/\s+/)
+                    parsed.firstName = nameParts[0]
+                    parsed.lastName = nameParts.slice(1).join(' ') || nameParts[0]
+                } else if (!parsed.userName || parsed.userName.includes('PDF') || parsed.userName.includes('ATTACHMENT')) {
+                    console.warn('[Parser] ⚠️  Name extraction failed or invalid AI result')
+                    parsed.userName = "⚠️ Name Not Found"
+                }
+
                 return parsed
             } else {
                 throw new Error("No valid JSON found in AI response")
@@ -187,6 +257,19 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
                 if (!parsed.poNumber) {
                     console.error('[Parser] ❌ PO extraction failed')
                     parsed.poNumber = "⚠️ NOT FOUND"
+                }
+
+                // ALWAYS use proximity-based name extraction
+                console.log('[Parser] Using proximity extraction for student name...')
+                const extractedName = extractStudentName(emailBody, parsed.userEmail)
+                if (extractedName) {
+                    parsed.userName = extractedName
+                    const nameParts = extractedName.split(/\s+/)
+                    parsed.firstName = nameParts[0]
+                    parsed.lastName = nameParts.slice(1).join(' ') || nameParts[0]
+                } else if (!parsed.userName || parsed.userName.includes('PDF') || parsed.userName.includes('ATTACHMENT')) {
+                    console.warn('[Parser] ⚠️  Name extraction failed or invalid AI result')
+                    parsed.userName = "⚠️ Name Not Found"
                 }
 
                 return parsed
@@ -220,12 +303,17 @@ function fallbackParse(body: string, subject: string, senderEmail: string, provi
     const invalidNames = ['PDF ATTACHMENT', 'ATTACHMENT CONTENT', 'PURCHASE ORDER']
     const isValidName = extractedName && !invalidNames.some(invalid => extractedName.includes(invalid))
 
+    const studentName = isValidName ? extractedName : "⚠️ Name Not Found"
+    const nameParts = isValidName ? extractedName.split(/\s+/) : []
+
     const bodyLower = body.toLowerCase()
 
     return {
         provider,
         providerContact: "Team",
-        userName: isValidName ? extractedName : "⚠️ Name Not Found",
+        userName: studentName,
+        firstName: nameParts[0] || "",
+        lastName: nameParts.slice(1).join(' ') || nameParts[0] || "",
         userEmail: studentEmail,
         licenseYears: bodyLower.includes("3 year") ? 3 : bodyLower.includes("2 year") ? 2 : bodyLower.includes("4 year") ? 4 : 1,
         poNumber: extractPONumber(body) || "⚠️ NOT FOUND",
