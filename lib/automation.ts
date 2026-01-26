@@ -30,14 +30,12 @@ export async function automateUserCreation(userData: {
         }
 
         const page = await browser.newPage()
-        // Set a reasonable viewport for rails_admin
-        await page.setViewport({ width: 1280, height: 800 })
+        await page.setViewport({ width: 1280, height: 1000 })
 
         // 1. Login
         console.log("[Automation] Logging into admin panel...")
         await page.goto("https://www.audemic.app/admin/login", { waitUntil: "networkidle2" })
 
-        // Check if already logged in
         if (page.url().includes("/admin/login")) {
             await page.type('input[name="admin_user[email]"]', adminEmail)
             await page.type('input[name="admin_user[password]"]', adminPassword)
@@ -45,34 +43,50 @@ export async function automateUserCreation(userData: {
             await page.waitForNavigation({ waitUntil: "networkidle2" })
         }
 
-        // 2. Create User
-        console.log(`[Automation] Creating user: ${userData.email}`)
-        await page.goto("https://www.audemic.app/admin/user/new", { waitUntil: "networkidle2" })
+        // 2. Start Subscription / Add New User (Nested)
+        console.log(`[Automation] Navigating to New Subscription page...`)
+        await page.goto("https://www.audemic.app/admin/subscription/new", { waitUntil: "networkidle2" })
 
-        await page.type('input[name="user[email]"]', userData.email)
-        await page.type('input[name="user[password]"]', "Audemic@123")
+        // 3. Create User in Modal
+        console.log(`[Automation] Opening 'Add a new User' modal...`)
+        // The "+ Add a new User" button usually has class btn-info
+        await page.click('a.btn-info[data-link="/admin/user/new"]')
+
+        // Wait for modal to appear and become visible
+        await page.waitForSelector('#modal.show', { visible: true })
+        console.log(`[Automation] Modal visible, filling user details...`)
+
+        await page.type('#modal input#user_email', userData.email)
+        await page.type('#modal input#user_password', "Audemic@123")
 
         const names = userData.userName.split(" ")
         const firstName = names[0]
         const lastName = names.slice(1).join(" ") || firstName
 
-        await page.type('input[name="user[first_name]"]', firstName)
-        await page.type('input[name="user[last_name]"]', lastName)
+        await page.type('#modal input#user_first_name', firstName)
+        await page.type('#modal input#user_last_name', lastName)
 
-        // Submit user creation
-        await page.click('button[name="_save"]')
-        await page.waitForNavigation({ waitUntil: "networkidle2" })
+        // Set email_confirmed and active in modal if switches exist
+        try {
+            // Find switches within modal
+            const confirmedToggle = await page.$('#modal a[data-id="user_email_confirmed"]')
+            if (confirmedToggle) await confirmedToggle.click()
 
-        // 3. Create Subscription
-        console.log(`[Automation] Creating subscription for ${userData.email} (${userData.licenseYears} years)`)
-        await page.goto("https://www.audemic.app/admin/subscription/new", { waitUntil: "networkidle2" })
+            const activeToggle = await page.$('#modal a[data-id="user_active"]')
+            if (activeToggle) await activeToggle.click()
+        } catch (e) {
+            console.log("[Automation] Error clicking toggles in modal, continuing...")
+        }
 
-        // Find the User mapping (searchable dropdown)
-        await page.click('.ra-filtering-select-input')
-        await page.keyboard.type(userData.email)
-        await new Promise(resolve => setTimeout(resolve, 1500)) // Wait for search results
-        await page.keyboard.press('ArrowDown')
-        await page.keyboard.press('Enter')
+        console.log(`[Automation] Saving user in modal...`)
+        await page.click('#modal .save-action')
+
+        // Wait for modal to close
+        await page.waitForSelector('#modal', { hidden: true })
+        console.log(`[Automation] User created and modal closed.`)
+
+        // 4. Finalize Subscription
+        console.log(`[Automation] Filling subscription details...`)
 
         // Set Plan Type to Yearly
         await page.select('select#subscription_plan_type', 'yearly')
@@ -86,23 +100,19 @@ export async function automateUserCreation(userData: {
         await page.type('input#subscription_start_date', startDate)
         await page.type('input#subscription_end_date', endDate)
 
-        // Set Active to True (checkbox or specific toggle)
+        // Set Active to True on main form
         try {
-            await page.click('input#subscription_active_1')
+            await page.click('a[data-id="subscription_active"]')
         } catch (e) {
-            console.log("[Automation] Could not find specific active toggle, trying generic checkbox...")
-            const activeCheckbox = await page.$('input[name="subscription[active]"]')
-            if (activeCheckbox) {
-                const isChecked = await (await activeCheckbox.getProperty('checked')).jsonValue()
-                if (!isChecked) await activeCheckbox.click()
-            }
+            console.log("[Automation] Could not toggle active on main form, continuing...")
         }
 
         // Save Subscription
+        console.log(`[Automation] Saving subscription...`)
         await page.click('button[name="_save"]')
         await page.waitForNavigation({ waitUntil: "networkidle2" })
 
-        console.log("[Automation] Success: User and Subscription created.")
+        console.log("[Automation] Success: Nested User and Subscription created.")
         await browser.close()
         return { success: true }
     } catch (error: any) {
