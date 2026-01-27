@@ -14,6 +14,8 @@ export async function automateUserCreation(userData: {
     email: string
     userName: string
     licenseYears: number
+    poNumber: string
+    provider: string
 }): Promise<AutomationResult> {
 
     // Parse name
@@ -26,7 +28,11 @@ export async function automateUserCreation(userData: {
     const userResult = await createAudemicUser({
         email: userData.email,
         firstName,
-        lastName
+        lastName,
+        dsaEligible: true, // Implicitly true if coming through this automation
+        dsaDurationYears: userData.licenseYears,
+        dsaProvider: userData.provider,
+        poNumber: userData.poNumber
     })
 
     if (!userResult.success) {

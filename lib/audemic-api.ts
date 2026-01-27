@@ -1,94 +1,86 @@
 /**
  * Audemic API Client
- * Creates users and updates profiles via direct API calls (much more reliable than browser automation)
+ * Creates users, updates profiles, and creates subscriptions.
  */
 
-const BASE_URL = "https://www.audemic.app"
+const BASE_URL = process.env.AUDEMIC_API_URL || "https://www.audemic.app"
 
 export interface CreateUserResult {
     success: boolean
-    userId?: number
+    userId?: number | string
     error?: string
 }
 
-export interface UserData {
+export interface CreateUserOptions {
     email: string
     firstName: string
     lastName: string
+    dsaEligible?: boolean
+    dsaDurationYears?: number
+    dsaProvider?: string
+    poNumber?: string
 }
 
 /**
  * Creates a new user in Audemic via API
  */
-export async function createAudemicUser(userData: UserData): Promise<CreateUserResult> {
-    const password = "Audemic@123"
-
+export async function createAudemicUser(userData: CreateUserOptions): Promise<{ success: boolean; error?: string; userId?: number; subscriptionId?: string }> {
     try {
-        // Step 1: Create user
+        // Authenticate to get token (needed for some ops, but usually signup creates its own)
+        // For the new flow, we just hit /users directly with the payload.
+
+        const password = process.env.DEFAULT_USER_PASSWORD || "Audemic@123"
+
+        // Step 1: Create user with DSA params
         console.log(`[Audemic API] Creating user: ${userData.email}`)
-        const createResponse = await fetch(`${BASE_URL}/users`, {
+
+        let createResponse = await fetch(`${BASE_URL}/users`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                "Accept": "application/json",
+                "x-client": "audemic-scholar-mobile"
             },
             body: JSON.stringify({
                 user: {
                     email: userData.email,
                     password: password,
-                    action: "signup"
+                    first_name: userData.firstName,
+                    last_name: userData.lastName,
+                    action: "signup",
+                    // DSA Extensions (Waiting for backend implementation)
+                    dsa_eligible: userData.dsaEligible,
+                    dsa_duration_years: userData.dsaDurationYears,
+                    dsa_provider: userData.dsaProvider,
+                    po_number: userData.poNumber
                 }
             })
         })
 
         if (!createResponse.ok) {
-            let errorMessage = `HTTP ${createResponse.status}`
-            try {
-                const errorData = await createResponse.json()
-                errorMessage = errorData.message || errorData.error || errorData.errors?.join(", ") || JSON.stringify(errorData)
-            } catch (e) {
-                // Not JSON, try to get text snippet
-                try {
-                    const text = await createResponse.text()
-                    errorMessage = text.substring(0, 200)
-                } catch (e2) { /* ignore */ }
-            }
-            return { success: false, error: `Failed to create user: ${errorMessage}` }
+            const errorText = await createResponse.text()
+            console.error(`[Audemic API] Signup failed: ${createResponse.status} ${errorText}`)
+            return { success: false, error: `Signup failed: ${createResponse.status}` }
         }
 
-        const createData = await createResponse.json()
-        const userId = createData.data?.refresh_token?.user_id
-        const authToken = createData.data?.token
+        const data = await createResponse.json()
+        const userId = data.data?.user?.id
+        const subscriptionId = data.data?.subscription?.stripe_id
 
         if (!userId) {
-            return { success: false, error: "User created but no user_id returned" }
+            return { success: false, error: "User created but no ID returned" }
         }
 
-        console.log(`[Audemic API] User created with ID: ${userId}`)
+        console.log(`[Audemic API] User created successfully! ID: ${userId}, SubID: ${subscriptionId || 'None'}`)
 
-        // Step 2: Update profile with name
-        console.log(`[Audemic API] Updating profile for user ${userId}`)
-        const profileResponse = await fetch(`${BASE_URL}/api/v2/profiles/${userId}`, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-                ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
-            },
-            body: JSON.stringify({
-                user: {
-                    first_name: userData.firstName,
-                    last_name: userData.lastName
-                }
-            })
-        })
+        // With the new DSA flow, signup handles everything.
+        // We return the Stripe ID for logging if available.
 
-        if (!profileResponse.ok) {
-            console.warn(`[Audemic API] Profile update failed: ${profileResponse.status} - continuing anyway`)
-            // Don't fail entirely if profile update fails
-        } else {
-            console.log(`[Audemic API] Profile updated successfully`)
+        return {
+            success: true,
+            userId: parseInt(userId),
+            subscriptionId: subscriptionId
         }
-
-        return { success: true, userId }
 
     } catch (error: any) {
         console.error("[Audemic API] Error:", error)

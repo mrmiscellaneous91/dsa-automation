@@ -7,7 +7,7 @@ export const WELCOME_EMAIL_TEMPLATE = (name: string, email: string, years: numbe
   
   <p style="background: #f4f4f4; padding: 10px; border-radius: 5px;">
     <strong>email:</strong> ${email}<br>
-    <strong>password:</strong> Audemic@123
+    <strong>password:</strong> ${process.env.DEFAULT_USER_PASSWORD}
   </p>
 
   <p>To get you onboarding and make sure you are getting the best use 

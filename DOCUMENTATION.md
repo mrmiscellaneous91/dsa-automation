@@ -79,6 +79,10 @@ dsa-automation/
 │   └── templates.ts            # Email templates
 └── components/
     └── TaskCard.tsx            # Student request cards
+├── scripts/
+│   └── postman/                # Postman integration tools
+│       ├── list_workspaces.js  # List available workspaces
+│       └── list_endpoints.js   # List endpoints in workspace
 ```
 
 ---
@@ -162,6 +166,11 @@ AUDEMIC_API_URL=https://www.audemic.app
 AUDEMIC_API_KEY=???
 AUDEMIC_ADMIN_EMAIL=???
 AUDEMIC_ADMIN_PASSWORD=???
+
+# Postman Integration (✅ Configured)
+POSTMAN_API_KEY=xxx
+POSTMAN_WORKSPACE_ID=xxx
+DEFAULT_USER_PASSWORD=xxx
 ```
 
 ---
@@ -170,3 +179,28 @@ AUDEMIC_ADMIN_PASSWORD=???
 
 - **Dashboard**: https://dsa-automation-three.vercel.app
 - **GitHub**: https://github.com/mrmiscellaneous91/dsa-automation
+
+---
+
+## Test User Tracking
+To avoid "500 Internal Server Error" (User already exists) during testing, we increment the integer `X` in `X@audemic.io`.
+
+**Current Test User ID**: `3`
+
+---
+
+## Agentic Tools Available
+
+These tools are designed to help AI agents (like Antigravity) understand and interact with external systems.
+
+### Postman Integration
+ Located in `scripts/postman/`.
+
+- **`node scripts/postman/list_workspaces.js`**
+  - **Purpose**: JSON-formatted list of all available Postman workspaces observable by the API Key.
+  - **Usage**: Run this to find the `POSTMAN_WORKSPACE_ID` if it changes or if setting up a new environment.
+
+- **`node scripts/postman/list_endpoints.js`**
+  - **Purpose**: Lists all available API endpoints (Method + URL) in the configured workspace.
+  - **Usage**: Use this to discover API capabilities, verify endpoint URLs, or check for new API additions without needing to leave the coding environment.
+  - **Prerequisites**: Requires `POSTMAN_API_KEY` and `POSTMAN_WORKSPACE_ID` in `.env`.
