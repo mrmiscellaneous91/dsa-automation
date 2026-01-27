@@ -75,7 +75,7 @@ function extractLicenseYears(body: string): number {
 /**
  * Robust Student Name Extractor
  */
-function extractStudentName(emailBody: string, studentEmail: string): string {
+export function extractStudentName(emailBody: string, studentEmail: string): string {
     if (!studentEmail) return ""
 
     // 1. Isolate Body from PDF
