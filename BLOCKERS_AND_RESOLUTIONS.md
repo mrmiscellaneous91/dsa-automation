@@ -42,3 +42,52 @@ The **Backend API** is currently **missing** the required implementation to acce
 - **500 Error Fix**: Confirmed that the 500 error was due to duplicate emails. Automation logic must ensure unique emails or handle existing users (future work).
 - **Dependency Update**: Updated `lib/automation.ts` to accept `poNumber` and `provider` from the parsing layer, ensuring no data is dropped before reaching the API client.
 - **Spec Defined**: Provided the backend team with the exact JSON contract required for the integration.
+
+## 📝 Backend Requirements Specification
+
+### 1. Extension: Signup Endpoint
+**Endpoint**: `POST /users`
+
+#### Required Extra Fields (in `user` object)
+| Field Name | Type | Example | Description |
+| :--- | :--- | :--- | :--- |
+| `dsa_eligible` | Boolean | `true` | **Trigger flag**. If true, bypasses payment. |
+| `dsa_duration_years` | Integer | `2` | Duration of the funded license. |
+| `dsa_provider` | String | `"Remtek"` | The DSA provider name. |
+| `po_number` | String | `"PO-12345"` | Purchase Order number. |
+
+#### Proposed Payload
+```json
+{
+  "user": {
+    "email": "student@university.ac.uk",
+    "password": "SecurePassword123",
+    "action": "signup",
+    "dsa_eligible": true,
+    "dsa_duration_years": 4,
+    "dsa_provider": "Remtek",
+    "po_number": "PO-998877"
+  }
+}
+```
+
+### 2. Extension: Subscription Response
+**Endpoint**: `GET /api/v2/subscription` (or via Signup response)
+
+#### Required Response Fields
+| Field Name | Type | Example | Description |
+| :--- | :--- | :--- | :--- |
+| `stripe_subscription_id` | String | `"sub_1Pk..."` | Critical for future updates/cancellations. |
+
+#### Proposed Response
+```json
+{
+  "data": {
+    "token": "...",
+    "subscription": {
+       "stripe_id": "sub_1Pk...",
+       "status": "active"
+    }
+  }
+}
+```
