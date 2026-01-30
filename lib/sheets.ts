@@ -10,7 +10,7 @@ export async function appendToSheet(sheets: any, spreadsheetId: string, range: s
     await sheets.spreadsheets.values.append({
         spreadsheetId,
         range,
-        valueInputOption: "RAW",
+        valueInputOption: "USER_ENTERED",
         requestBody: {
             values,
         },
@@ -21,7 +21,7 @@ export async function updateSheet(sheets: any, spreadsheetId: string, range: str
     await sheets.spreadsheets.values.update({
         spreadsheetId,
         range,
-        valueInputOption: "RAW",
+        valueInputOption: "USER_ENTERED",
         requestBody: {
             values,
         },
