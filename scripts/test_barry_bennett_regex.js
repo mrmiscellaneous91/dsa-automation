@@ -62,7 +62,18 @@ const pdfLines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length >
 const studentEmail = "23389200@live.harper.ac.uk";
 const emailIdx = pdfLines.findIndex(l => l.toLowerCase().includes(studentEmail.toLowerCase()));
 if (emailIdx > 0 && pdfLines[emailIdx - 1]) {
-    console.log("Name Match (Lines):", pdfLines[emailIdx - 1]);
+    // Clean up: strip leading digits/punctuation
+    let rawName = pdfLines[emailIdx - 1];
+    let cleanName = rawName.replace(/^[\d\s.,;:\-]+/, '').trim();
+    console.log("Raw Name:", rawName);
+    console.log("Clean Name:", cleanName);
 } else {
     console.log("Name Match (Lines): NOT FOUND");
 }
+
+// Also test the specific case
+const testCases = ["2Elise Blake", "2 Elise Blake", "  2  Elise Blake", "Elise Blake"];
+testCases.forEach(tc => {
+    const clean = tc.replace(/^[\d\s.,;:\-]+/, '').trim();
+    console.log(`"${tc}" -> "${clean}"`);
+});

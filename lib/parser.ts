@@ -147,7 +147,8 @@ function extractStudentNameInternal(emailBody: string, studentEmail: string, ide
         const emailIdx = lines.findIndex(l => l.toLowerCase().includes(anchor))
 
         if (emailIdx > 0 && lines[emailIdx - 1]) {
-            const possibleName = lines[emailIdx - 1]
+            // Clean up: strip leading digits/punctuation (e.g., "2Elise Blake" -> "Elise Blake")
+            let possibleName = lines[emailIdx - 1].replace(/^[\d\s.,;:\-]+/, '').trim()
             // Basic validation: 2+ words, not blacklisted
             if (possibleName.split(' ').length >= 2 && !blacklist.some(b => possibleName.toUpperCase().includes(b.toUpperCase()))) {
                 console.log(`[Name Extract] ✅ Barry Bennett PDF Email-Anchor Match: ${possibleName}`)
