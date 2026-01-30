@@ -47,12 +47,13 @@ A web dashboard that automates the DSA (Disabled Students' Allowance) student on
 | **Dashboard UI** | ✅ Complete | Next.js app with task cards |
 | **Gmail Integration** | ✅ Complete | OAuth, fetch, filter by provider |
 | **PDF Extraction** | ✅ Complete | Extracts text from PO attachments |
-| **AI Parser** | ✅ Complete | Claude/Gemini extracts structured data |
-| **Name Extraction** | ✅ Complete | Robust regex with blacklist filtering |
-| **Audemic User Creation** | ✅ Complete | Verified with `Test dsa` provider |
-| **Profile Update** | ➖ Merged | Handled in User Creation |
-| **Subscription Creation** | ✅ Complete | Verified with `PATCH` method |
-| **Email Templates** | ✅ Complete | Welcome emails ready |
+| **AI Parser** | ✅ Complete | Gemini extracts structured data |
+| **Name Extraction** | ✅ Complete | Robust regex with blacklist, strips leading digits |
+| **PO Extraction** | ✅ Complete | All provider formats supported |
+| **Audemic User Creation** | ✅ Complete | Production API verified |
+| **Subscription Creation** | ✅ Complete | PATCH method with date range |
+| **Google Sheets Logging** | ✅ Complete | USER_ENTERED for proper number formatting |
+| **Email Templates** | ✅ Complete | Welcome + confirmation emails with links |
 
 ---
 
@@ -176,14 +177,12 @@ Structured data → Audemic API (Production) → Create user (✅) → Create su
 
 ---
 
-## Next Steps
+## Recent Fixes (January 2026)
 
-1. **Get API documentation** from developer
-2. **Test each endpoint** with curl/Postman
-3. **Implement `lib/audemic-api.ts`** with verified endpoints
-4. **Wire up "Run Automation" button** to call the API
-5. **Add error handling and logging**
-6. **Test end-to-end with a real DSA request**
+1. **Barry Bennett Name Extraction** - Fixed to use email as anchor, strips leading digits from PDF tables
+2. **Barry Bennett PO Extraction** - Added pattern for "Purchase Order POR184451" format
+3. **Google Sheets Formatting** - Changed to USER_ENTERED so amounts display as numbers
+4. **Welcome Email Links** - Added hyperlinks for schedule call and demo
 
 ---
 
@@ -195,20 +194,16 @@ GOOGLE_CLIENT_ID=xxx
 GOOGLE_CLIENT_SECRET=xxx
 
 # AI Parser (✅ Configured)
-ANTHROPIC_API_KEY=xxx
-# OR
 GEMINI_API_KEY=xxx
 
-# Audemic API (❌ NEEDS CONFIG)
+# Audemic API (✅ Configured)
 AUDEMIC_API_URL=https://www.audemic.app
-AUDEMIC_API_KEY=???
-AUDEMIC_ADMIN_EMAIL=???
-AUDEMIC_ADMIN_PASSWORD=???
 
-# Postman Integration (✅ Configured)
-POSTMAN_API_KEY=xxx
-POSTMAN_WORKSPACE_ID=xxx
-DEFAULT_USER_PASSWORD=xxx
+# Google Sheets (✅ Configured)
+SPREADSHEET_ID=xxx
+
+# User Defaults (✅ Configured)
+DEFAULT_USER_PASSWORD=Audemic@123
 ```
 
 ---

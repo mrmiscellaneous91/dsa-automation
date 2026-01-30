@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DSA Automation Dashboard
 
-## Getting Started
+**An internal tool for Audemic that automatically processes DSA (Disabled Students' Allowance) purchase orders and creates student accounts.**
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## What Does This Do?
+
+When a DSA provider (like Remtek, Invate, or Barry Bennett) emails Audemic with a student's purchase order, this tool:
+
+1. **Reads the email** - Fetches new emails from the Audemic Gmail inbox
+2. **Extracts the information** - Uses AI to pull out student name, email, PO number, and license duration
+3. **Creates the account** - Automatically provisions an Audemic Scholar subscription
+4. **Logs to Google Sheets** - Records the transaction for tracking
+5. **Sends emails** - Welcome email to the student, confirmation to the provider
+
+---
+
+## How to Use It
+
+### Daily Use
+
+1. Go to **https://dsa-automation-three.vercel.app**
+2. Sign in with the Audemic Google account
+3. Click **"Check for New Requests"** to fetch pending DSA emails
+4. Review each request card - verify the name, email, and PO are correct
+5. Click through each step:
+   - **Log to Spreadsheet** → Records the transaction
+   - **Automated Provisioning** → Creates the user account
+   - **Send Welcome Email** → Emails credentials to student
+   - **Confirm to Provider** → Notifies the DSA provider
+
+### If Something Looks Wrong
+
+- **Wrong name?** The AI sometimes picks up extra text. You can manually edit before processing.
+- **Missing PO number?** Check if the email format changed from the provider.
+- **Error during provisioning?** The user may already exist in Audemic.
+
+---
+
+## Supported DSA Providers
+
+| Provider | Email Domain | Status |
+|----------|--------------|--------|
+| Remtek | remtek.co.uk | ✅ Working |
+| Invate | invate.co.uk | ✅ Working |
+| Barry Bennett | barrybennet-group.co.uk | ✅ Working |
+| Assistive | sightandsoundtech.co.uk | ✅ Working |
+
+---
+
+## Key Files (For Future Reference)
+
+| File | What It Does |
+|------|--------------|
+| `lib/parser.ts` | Extracts student info from emails using AI + regex |
+| `lib/templates.ts` | Email templates (welcome email, confirmation) |
+| `lib/audemic-api.ts` | Connects to Audemic backend to create users |
+| `lib/sheets.ts` | Logs transactions to Google Sheets |
+| `app/api/gmail/` | Fetches and sends emails via Gmail API |
+
+---
+
+## Environment Variables
+
+These are stored in `.env` (never commit this file):
+
+```
+GOOGLE_CLIENT_ID=...          # Gmail OAuth
+GOOGLE_CLIENT_SECRET=...
+GEMINI_API_KEY=...            # AI for parsing emails
+SPREADSHEET_ID=...            # Google Sheets ID for logging
+DEFAULT_USER_PASSWORD=...     # Default password for new users
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Hosted on**: Vercel (auto-deploys from GitHub `main` branch)
+- **GitHub**: https://github.com/mrmiscellaneous91/dsa-automation
+- **Live URL**: https://dsa-automation-three.vercel.app
 
-## Learn More
+### To Deploy Changes
 
-To learn more about Next.js, take a look at the following resources:
+1. Push to `main` branch on GitHub
+2. Vercel automatically builds and deploys (takes ~1-2 minutes)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### To Run Locally
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd dsa-automation
+npm install
+npm run dev
+```
 
-## Deploy on Vercel
+Then open http://localhost:3000
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Common Issues & Fixes
+
+### "2" appearing before student names (Barry Bennett)
+**Fixed**: The parser now strips leading numbers from PDF table extractions.
+
+### Amounts showing as text in Google Sheets (with apostrophe)
+**Fixed**: Changed `valueInputOption` from `RAW` to `USER_ENTERED`.
+
+### Missing links in welcome email
+**Fixed**: Added hyperlinks for schedule call and demo.
+
+### Wrong PO number extracted
+Check `lib/parser.ts` - the `extractPONumber` function has regex patterns for each provider format.
+
+---
+
+## Contact
+
+For technical issues with this automation, contact the developer or reference the `DOCUMENTATION.md` file for detailed technical information.
