@@ -49,9 +49,9 @@ A web dashboard that automates the DSA (Disabled Students' Allowance) student on
 | **PDF Extraction** | ✅ Complete | Extracts text from PO attachments |
 | **AI Parser** | ✅ Complete | Claude/Gemini extracts structured data |
 | **Name Extraction** | ✅ Complete | Robust regex with blacklist filtering |
-| **Audemic User Creation** | ⚠️ Partial | Endpoint exists, needs verification |
-| **Profile Update** | ❌ Not started | Waiting for API details |
-| **Subscription Creation** | ❌ Not started | Waiting for API details |
+| **Audemic User Creation** | ✅ Complete | Verified with `Test dsa` provider |
+| **Profile Update** | ➖ Merged | Handled in User Creation |
+| **Subscription Creation** | ✅ Complete | Verified with `PATCH` method |
 | **Email Templates** | ✅ Complete | Welcome emails ready |
 
 ---
@@ -106,11 +106,9 @@ Email body + PDF → AI Parser (Claude/Gemini) → Structured data:
 }
 ```
 
-### Step 3: User Provisioning (⚠️ BLOCKED)
+### Step### 3. User Provisioning (✅ VERIFIED)
 ```
-Structured data → Audemic API → Create user + subscription
-                      ↑
-              WAITING FOR API DETAILS
+Structured data → Audemic API (Production) → Create user (✅) → Create subscription (✅ PATCH)
 ```
 
 ---
@@ -124,17 +122,57 @@ Structured data → Audemic API → Create user + subscription
 
 ---
 
-## What's Blocked
+## ✅ API Reference (Verified Production)
 
-### Audemic API Integration
+### 1. Create User
+**Endpoint**: `POST https://www.audemic.app/api/v2/dsa/users/`
+**Headers**: `Content-Type: application/json`
 
-We need these API details to complete the automation:
+**Request Body**:
+```json
+{
+  "dsa_provider": "Test dsa",
+  "user": {
+    "email": "admin@audemic.io9001",
+    "password": "Audemic123",
+    "po_number": "PO-12345",
+    "first_name": "John",
+    "last_name": "Doe"
+  }
+}
+```
 
-| Action | Endpoint | Body | Headers | Response |
-|--------|----------|------|---------|----------|
-| Create User | `???` | `email, password` | `???` | `user_id` |
-| Update Profile | `???` | `first_name, last_name, dsa` | `???` | Success |
-| Create Subscription | `???` | `user_id, plan, duration` | `???` | `subscription_id` |
+**Success Response (200 OK)**:
+```json
+{
+  "user_id": 44256,
+  "email": "admin@audemic.io9001"
+}
+```
+
+### 2. Create Subscription
+**Endpoint**: `PATCH https://www.audemic.app/api/v2/dsa/subscriptions/`
+**Headers**:
+- `Content-Type: application/json`
+- `x-client: audemic-scholar-mobile`
+
+**Request Body**:
+```json
+{
+  "user_id": "44256",
+  "end_date": "10-12-2026"
+}
+```
+
+**Success Response (200 OK)**:
+```json
+{
+  "subscription": {
+    "id": 3745,
+    "end_date": "2026-12-10"
+  }
+}
+```
 
 ---
 

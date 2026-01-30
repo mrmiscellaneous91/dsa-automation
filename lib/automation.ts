@@ -41,8 +41,8 @@ export async function automateUserCreation(userData: {
 
     console.log(`[Automation] User created successfully! ID: ${userResult.userId}`)
 
-    // TODO: Add subscription creation later
-    // For now, just return success after user creation
+    // Subscription is now created automatically within createAudemicUser
+    console.log(`[Automation] Full flow complete.`)
 
     return { success: true, userId: userResult.userId }
 }
