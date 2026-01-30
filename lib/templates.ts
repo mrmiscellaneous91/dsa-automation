@@ -1,13 +1,13 @@
-export const WELCOME_EMAIL_TEMPLATE = (name: string, email: string, years: number) => `
+export const WELCOME_EMAIL_TEMPLATE = (name: string, email: string, years: number, password?: string) => `
 <div style="font-family: Arial, sans-serif; color: #333;">
   <p>Hi ${name},</p>
   <p>You now have ${years} year access to Audemic Scholar!</p>
   <p>To log in, <a href="https://app.audemic.io">go here</a> and please use the credentials below. 
-  Then change your password by heading to the profile section (Screenshot can be found below)</p>
+  Then change your password by heading to the profile section</p>
   
   <p style="background: #f4f4f4; padding: 10px; border-radius: 5px;">
     <strong>email:</strong> ${email}<br>
-    <strong>password:</strong> ${process.env.DEFAULT_USER_PASSWORD}
+    <strong>password:</strong> ${password || process.env.DEFAULT_USER_PASSWORD || 'Audemic@123'}
   </p>
 
   <p>To get you onboarding and make sure you are getting the best use 

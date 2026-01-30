@@ -66,7 +66,7 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
         setError("")
         try {
             const firstName = parsed.userName.split(" ")[0]
-            const body = WELCOME_EMAIL_TEMPLATE(firstName, parsed.userEmail, parsed.licenseYears)
+            const body = WELCOME_EMAIL_TEMPLATE(firstName, parsed.userEmail, parsed.licenseYears, 'Audemic@123')
             const res = await fetch("/api/gmail/send", {
                 method: "POST",
                 body: JSON.stringify({

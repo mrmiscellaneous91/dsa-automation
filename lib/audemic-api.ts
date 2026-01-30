@@ -1,13 +1,16 @@
 /**
  * Audemic API Client
- * Creates users, updates profiles, and creates subscriptions.
+ * Creates users, updates profiles, and creates subscriptions using DSA endpoints.
  */
 
 const BASE_URL = process.env.AUDEMIC_API_URL || "https://www.audemic.app"
+const X_CLIENT = process.env.AUDEMIC_X_CLIENT || "audemic-scholar-mobile"
+const DEFAULT_PASSWORD = process.env.DEFAULT_USER_PASSWORD || "Audemic@123"
 
 export interface CreateUserResult {
     success: boolean
-    userId?: number | string
+    userId?: number
+    subscriptionId?: number
     error?: string
 }
 
@@ -24,12 +27,9 @@ export interface CreateUserOptions {
 /**
  * Creates a new user in Audemic via API and provisions a subscription
  */
-export async function createAudemicUser(userData: CreateUserOptions): Promise<{ success: boolean; error?: string; userId?: number; subscriptionId?: string }> {
+export async function createAudemicUser(userData: CreateUserOptions): Promise<CreateUserResult> {
     try {
-        const password = process.env.DEFAULT_USER_PASSWORD || "Audemic@123"
-        // Verified Provider: "Test dsa" (staging/prod workaround) or real provider if seeded
-        // In production context, we should use the actual provider name if available, or fall back to "Test dsa" if testing.
-        // For now, I will pass the provider as is, but note the case sensitivity requirement in docs.
+        const password = DEFAULT_PASSWORD
         const providerName = userData.dsaProvider || "Test dsa"
 
         // Step 1: Create user
@@ -51,7 +51,7 @@ export async function createAudemicUser(userData: CreateUserOptions): Promise<{ 
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "x-client": "audemic-scholar-mobile"
+                "x-client": X_CLIENT
             },
             body: JSON.stringify(userPayload)
         })
@@ -62,7 +62,6 @@ export async function createAudemicUser(userData: CreateUserOptions): Promise<{ 
             return { success: false, error: `Signup failed: ${createResponse.status} ${errorText}` }
         }
 
-        // Expected Response: { "user_id": 123, "email": "..." }
         const keyData = await createResponse.json()
         const userId = keyData.user_id
 
@@ -73,7 +72,6 @@ export async function createAudemicUser(userData: CreateUserOptions): Promise<{ 
         console.log(`[Audemic API] User created successfully! ID: ${userId}. Proceeding to subscription...`)
 
         // Step 2: Create Subscription
-        // Calculate end date based on duration
         const years = userData.dsaDurationYears || 4
         const endDate = new Date()
         endDate.setFullYear(endDate.getFullYear() + years)
@@ -81,15 +79,15 @@ export async function createAudemicUser(userData: CreateUserOptions): Promise<{ 
 
         const subPayload = {
             user_id: String(userId),
-            end_date: formattedEndDate // "10-12-2026"
+            end_date: formattedEndDate
         }
 
         const subResponse = await fetch(`${BASE_URL}/api/v2/dsa/subscriptions/`, {
-            method: "PATCH", // Verified as PATCH
+            method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "x-client": "audemic-scholar-mobile" // Required header
+                "x-client": X_CLIENT
             },
             body: JSON.stringify(subPayload)
         })
@@ -97,13 +95,13 @@ export async function createAudemicUser(userData: CreateUserOptions): Promise<{ 
         if (!subResponse.ok) {
             const subError = await subResponse.text()
             console.error(`[Audemic API] Subscription failed: ${subResponse.status} ${subError}`)
-            // We return success: false because the user is useless without a sub?
-            // Or true with error? Let's return partial success or fail.
-            // Requirement says "User Provisioning", so fail is appropriate if sub fails.
-            return { success: false, error: `User created (ID: ${userId}) but subscription failed: ${subResponse.status}`, userId: userId }
+            return { 
+                success: false, 
+                error: `User created (ID: ${userId}) but subscription failed: ${subResponse.status}`,
+                userId: parseInt(userId)
+            }
         }
 
-        // Expected Response: { "subscription": { "id": 3745, "end_date": "..." } }
         const subData = await subResponse.json()
         const subscriptionId = subData.subscription?.id
 

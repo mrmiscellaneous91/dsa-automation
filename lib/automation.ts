@@ -7,8 +7,7 @@ export interface AutomationResult {
 }
 
 /**
- * Creates a user via Audemic API
- * Subscription creation is paused for now
+ * Creates a user and subscription via Audemic API
  */
 export async function automateUserCreation(userData: {
     email: string
@@ -23,8 +22,8 @@ export async function automateUserCreation(userData: {
     const firstName = names[0]
     const lastName = names.slice(1).join(" ") || firstName
 
-    // Create user via API
-    console.log("[Automation] Creating user via API...")
+    // Create user and subscription via API
+    console.log("[Automation] Creating user and subscription via API...")
     const userResult = await createAudemicUser({
         email: userData.email,
         firstName,
@@ -39,9 +38,7 @@ export async function automateUserCreation(userData: {
         return { success: false, error: userResult.error }
     }
 
-    console.log(`[Automation] User created successfully! ID: ${userResult.userId}`)
-
-    // Subscription is now created automatically within createAudemicUser
+    console.log(`[Automation] User and subscription created successfully! ID: ${userResult.userId}`)
     console.log(`[Automation] Full flow complete.`)
 
     return { success: true, userId: userResult.userId }
