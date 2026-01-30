@@ -39,7 +39,10 @@ function extractPONumber(fullEmailBody: string, subject: string = ""): string {
         /\b(IPO[0-9]{5,8})\b/i,
 
         // Standalone 7-8 digit numbers starting with 5 or 6 (typical PO ranges)
-        /\b([56][0-9]{6,8})\b/
+        /\b([56][0-9]{6,8})\b/,
+
+        // Barry Bennett specific: "Order No. : 184451"
+        /Order No\.\s*:\s*([0-9]{5,10})/i
     ]
 
     for (let i = 0; i < patterns.length; i++) {
@@ -76,44 +79,37 @@ function extractLicenseYears(body: string): number {
  * Robust Student Name Extractor
  */
 export function extractStudentName(emailBody: string, studentEmail: string): string {
+    return extractStudentNameInternal(emailBody, studentEmail, "Unknown")
+}
+
+function extractStudentNameInternal(emailBody: string, studentEmail: string, identifiedProvider: string): string {
     if (!studentEmail) return ""
 
-    // 1. Isolate Body from PDF
+    // 1. Isolate Body from PDF for initial proximity check
     const marker = /\[PDF ATTACHMENT CONTENT\]/i
     const markerMatch = emailBody.match(marker)
-    const bodyOnly = markerMatch ? emailBody.substring(0, markerMatch.index) : emailBody
+    const bodyOnly = markerMatch ? emailBody.substring(0, markerMatch.index || 0) : emailBody
+    const pdfContent = markerMatch ? emailBody.substring(markerMatch.index || 0) : ""
 
-    // 2. Normalize Text
-    const normalizedBody = bodyOnly.toLowerCase()
-    const cleanText = bodyOnly.replace(/[\r\n\t\u2000-\u200B]+/g, ' ').replace(/\s+/g, ' ')
+    const normalizedBody = emailBody.toLowerCase()
 
-    // 3. Identify Anchor (clean email)
-    let anchor = studentEmail.toLowerCase()
-    if (anchor.includes('<')) {
-        const m = anchor.match(/<([^>]+)>/)
-        if (m) anchor = m[1].trim()
-    }
-
-    const emailIndex = normalizedBody.indexOf(anchor)
-
-    // 4. Blacklist / System Names
+    // Blacklist / System Names
     const blacklist = [
         'Student Name', 'Student Email', 'Purchase Order', 'PDF Attachment',
         'Operations Manager', 'Procurement Specialist', 'Audemic Licence',
         'Audemic Scholar', 'Joshua Mitcham', 'Paul Williamson', 'Vicki Ravensdale',
-        'Team Audemic', 'Support Team'
+        'Team Audemic', 'Support Team', 'Mimecast Ltd', 'Mimecast', 'Barry Bennett Ltd',
+        'Barry Bennett', 'Juliette Gallacher'
     ]
 
-    // 5. Extraction Logic
+    // Extraction Logic
     const process = (sourceText: string) => {
         const text = sourceText.replace(/[\r\n\t\u2000-\u200B]+/g, ' ').replace(/\s+/g, ' ')
-        // Match Capitalized Names (2-5 words)
-        const p1 = /\b([A-Z][A-Za-z'-]+(?:\s[A-Z][A-Za-z'-]+){1,4})\b/g
-        // Match ALL CAPS Names
+        const p1 = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,4})\b/g
         const p2 = /\b([A-Z]{2,}(?:\s[A-Z]{2,}){1,3})\b/g
 
         const raw = [...text.matchAll(p1), ...text.matchAll(p2)]
-        const suffixLabel = /\s+(Student|Email|User|Status|Name|Licence|Scholar|Dear|Hello|Best|Regards|Morning|Afternoon)$/i
+        const suffixLabel = /\s+(Student|Email|User|Status|Name|Licence|Scholar|Dear|Hello|Best|Regards|Morning|Afternoon|PO|Order|Date|Ref)$/i
 
         return raw.map(m => {
             let n = m[1].trim()
@@ -123,29 +119,45 @@ export function extractStudentName(emailBody: string, studentEmail: string): str
             const words = n.split(' ').length
             if (words < 2 || words > 5) return false
             const up = n.toUpperCase()
-            // Reject if EXACTLY in blacklist or contains blacklisted phrase
             return !blacklist.some(b => up.includes(b.toUpperCase()))
         })
     }
 
-    // Attempt A: Proximity Search (250 chars before email)
+    // Try proximity in body first
+    let anchor = studentEmail.toLowerCase()
+    const emailIndex = bodyOnly.toLowerCase().indexOf(anchor)
     if (emailIndex !== -1) {
         const window = bodyOnly.substring(Math.max(0, emailIndex - 250), emailIndex)
         const matches = process(window)
         if (matches.length > 0) {
-            const best = matches[matches.length - 1]
-            console.log(`[Name Extract] ✅ Proximity Match: ${best}`)
-            return best
+            console.log(`[Name Extract] ✅ Body Proximity Match: ${matches[matches.length - 1]}`)
+            return matches[matches.length - 1]
         }
     }
 
-    // Attempt B: Global Search
-    console.log('[Name Extract] Proximity failed, trying global search...')
-    const globalMatches = process(bodyOnly)
+    // Special Barry Bennett Pattern in PDF
+    if (identifiedProvider === "Barry Bennett" && pdfContent) {
+        // Look for "DSA \n Name \n Email" or similar.
+        // Emails are great anchors. Look for the line above the email.
+        const lines = pdfContent.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0)
+        let anchor = studentEmail.toLowerCase()
+        const emailIdx = lines.findIndex(l => l.toLowerCase().includes(anchor))
+
+        if (emailIdx > 0 && lines[emailIdx - 1]) {
+            const possibleName = lines[emailIdx - 1]
+            // Basic validation: 2+ words, not blacklisted
+            if (possibleName.split(' ').length >= 2 && !blacklist.some(b => possibleName.toUpperCase().includes(b.toUpperCase()))) {
+                console.log(`[Name Extract] ✅ Barry Bennett PDF Email-Anchor Match: ${possibleName}`)
+                return possibleName
+            }
+        }
+    }
+
+    // Global Search (Body + PDF)
+    const globalMatches = process(emailBody)
     if (globalMatches.length > 0) {
-        // Pick first decent match that isn't at the very start (to avoid headers)
-        const best = globalMatches.find(m => bodyOnly.indexOf(m) > 10) || globalMatches[0]
-        console.log(`[Name Extract] ✅ Global Match: ${best}`)
+        const best = globalMatches.find(m => emailBody.indexOf(m) > 10) || globalMatches[0]
+        console.log(`[Name Extract] ✅ Global Search Match: ${best}`)
         return best
     }
 
@@ -163,6 +175,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
 
     const prompt = `Extract DSA student info from this email. 
     Separate the body from the [PDF ATTACHMENT CONTENT]. 
+    If the provider is "Barry Bennett", student details (name, email) are usually located inside the [PDF ATTACHMENT CONTENT] under the Description column, often right after "DSA".
     Return JSON: { "userName": "Full Name", "userEmail": "student@email.com", "licenseYears": 1, "poNumber": "", "providerContact": "Sender Name" }
     
     EMAIL:
@@ -205,7 +218,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     }
 
     // Extract Student Name using our high-precision logic
-    const robustName = extractStudentName(emailBody, parsed.userEmail)
+    const robustName = extractStudentNameInternal(emailBody, parsed.userEmail, identifiedProvider)
 
     if (robustName) {
         parsed.userName = robustName
