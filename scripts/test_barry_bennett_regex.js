@@ -47,9 +47,16 @@ Elise Blake
 23389200@live.harper.ac.uk
 `;
 
-const poRegex = /Order No\.\s*:\s*([0-9]{5,10})/i;
-const poMatch = text.match(poRegex);
-console.log("PO Match:", poMatch ? poMatch[1] : "NOT FOUND");
+// Test 1: PO from Subject line (new pattern)
+const subject = "Barry Bennett Ltd. Purchase Order POR184451";
+const subjectPoRegex = /Purchase Order\s+(POR?[0-9]{5,10})/i;
+const subjectPoMatch = subject.match(subjectPoRegex);
+console.log("PO Match (Subject):", subjectPoMatch ? subjectPoMatch[1] : "NOT FOUND");
+
+// Test 2: PO from PDF (existing pattern)
+const pdfPoRegex = /Order No\.\s*:\s*([0-9]{5,10})/i;
+const pdfPoMatch = text.match(pdfPoRegex);
+console.log("PO Match (PDF):", pdfPoMatch ? pdfPoMatch[1] : "NOT FOUND");
 
 const pdfLines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0);
 const studentEmail = "23389200@live.harper.ac.uk";

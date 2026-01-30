@@ -28,6 +28,9 @@ function extractPONumber(fullEmailBody: string, subject: string = ""): string {
 
     // 2. High-reliability patterns
     const patterns = [
+        // Barry Bennett Subject: "Purchase Order POR184451" or "Purchase Order 184451"
+        /Purchase Order\s+(POR?[0-9]{5,10})/i,
+
         // Labeled: "PO: 5107980" or "Purchase Order No: IPO51565"
         /(?:PURCHASE ORDER NO\.|PO NO\.|ORDER NO\.|PO|P\.O\.)\s*[:\-\s]\s*([A-Z]*[0-9]{5,15})/i,
 
@@ -38,11 +41,11 @@ function extractPONumber(fullEmailBody: string, subject: string = ""): string {
         // Standalone Alphanumeric (e.g. IPO51565)
         /\b(IPO[0-9]{5,8})\b/i,
 
-        // Standalone 7-8 digit numbers starting with 5 or 6 (typical PO ranges)
-        /\b([56][0-9]{6,8})\b/,
+        // Barry Bennett PDF: "Order No. : 184451"
+        /Order No\.\s*:\s*([0-9]{5,10})/i,
 
-        // Barry Bennett specific: "Order No. : 184451"
-        /Order No\.\s*:\s*([0-9]{5,10})/i
+        // Standalone 7-8 digit numbers starting with 5 or 6 (typical PO ranges)
+        /\b([56][0-9]{6,8})\b/
     ]
 
     for (let i = 0; i < patterns.length; i++) {
