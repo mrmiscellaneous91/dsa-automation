@@ -2,6 +2,7 @@
 
 import { useSession, signIn, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import TaskCard from "@/components/TaskCard"
 
 export default function Home() {
@@ -99,20 +100,28 @@ export default function Home() {
             </button>
           )}
         </div>
-        <button
-          onClick={fetchTasks}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
-        >
-          {loading ? (
-            <>
-              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-              Checking Gmail...
-            </>
-          ) : (
-            "Check for New Requests"
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/issue"
+            className="bg-white hover:bg-slate-50 text-blue-600 border border-blue-100 px-6 py-2 rounded-xl font-bold transition-all shadow-sm flex items-center gap-2"
+          >
+            <span>➕</span> Manual Issue
+          </Link>
+          <button
+            onClick={fetchTasks}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                Checking Gmail...
+              </>
+            ) : (
+              "Check for New Requests"
+            )}
+          </button>
+        </div>
       </div>
 
       {error && (
