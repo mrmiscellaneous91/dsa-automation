@@ -1,18 +1,18 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 export default function IssueLicensePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  
+
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
-  
+
   const [formData, setFormData] = useState({
     userName: "",
     email: "",
@@ -21,17 +21,18 @@ export default function IssueLicensePage() {
     provider: "Supplier Manual Issue"
   })
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+    }
+  }, [status, router])
+
+  if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
-  }
-
-  if (!session) {
-    router.push("/")
-    return null
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,18 +75,18 @@ export default function IssueLicensePage() {
     <main className="min-h-screen bg-slate-50 py-12 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="mb-8 flex items-center justify-between">
-          <Link 
+          <Link
             href="/"
             className="text-gray-500 hover:text-gray-900 flex items-center gap-2 font-medium transition-colors"
           >
             ← Back to Dashboard
           </Link>
           <div className="flex items-center gap-3">
-             <img
-                src={session.user?.image || ""}
-                alt="User"
-                className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
-              />
+            <img
+              src={session.user?.image || ""}
+              alt="User"
+              className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+            />
           </div>
         </div>
 
