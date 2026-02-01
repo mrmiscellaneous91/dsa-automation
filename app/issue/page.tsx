@@ -18,7 +18,8 @@ export default function IssueLicensePage() {
     email: "",
     licenseYears: "1",
     poNumber: "",
-    provider: "Supplier Manual Issue"
+    provider: "Remtek", // Default to one of the known providers
+    poFile: null as File | null
   })
 
   useEffect(() => {
@@ -35,6 +36,10 @@ export default function IssueLicensePage() {
     )
   }
 
+  // Ensure session is available for image
+  const userImage = session?.user?.image || ""
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -42,13 +47,16 @@ export default function IssueLicensePage() {
     setSuccess(false)
 
     try {
+      // If we were handling files properly, we'd use FormData or upload to S3 here.
+      // For now, we'll keep the JSON flow and just pass the metadata.
       const res = await fetch("/api/admin/automate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userData: {
             ...formData,
-            licenseYears: parseInt(formData.licenseYears)
+            licenseYears: parseInt(formData.licenseYears),
+            poFileName: formData.poFile?.name || ""
           }
         })
       })
@@ -62,7 +70,8 @@ export default function IssueLicensePage() {
         email: "",
         licenseYears: "1",
         poNumber: "",
-        provider: "Supplier Manual Issue"
+        provider: "Remtek",
+        poFile: null
       })
     } catch (err: any) {
       setError(err.message)
@@ -83,7 +92,7 @@ export default function IssueLicensePage() {
           </Link>
           <div className="flex items-center gap-3">
             <img
-              src={session.user?.image || ""}
+              src={userImage}
               alt="User"
               className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
             />
@@ -127,6 +136,22 @@ export default function IssueLicensePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
+                <label htmlFor="provider" className="text-sm font-semibold text-gray-700">Supplier</label>
+                <select
+                  id="provider"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
+                  value={formData.provider}
+                  onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
+                >
+                  <option value="Remtek">Remtek</option>
+                  <option value="Invate">Invate</option>
+                  <option value="Barry Bennett">Barry Bennett</option>
+                  <option value="Assistive">Assistive</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
                 <label htmlFor="licenseYears" className="text-sm font-semibold text-gray-700">License Duration</label>
                 <select
                   id="licenseYears"
@@ -139,17 +164,44 @@ export default function IssueLicensePage() {
                   <option value="4">4 Years</option>
                 </select>
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <label htmlFor="poNumber" className="text-sm font-semibold text-gray-700">PO Number</label>
-                <input
-                  id="poNumber"
-                  type="text"
-                  placeholder="e.g. PO-98765"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  value={formData.poNumber}
-                  onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
-                />
+            <div className="space-y-2">
+              <label htmlFor="poNumber" className="text-sm font-semibold text-gray-700">PO Number</label>
+              <input
+                id="poNumber"
+                type="text"
+                placeholder="e.g. PO-98765"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                value={formData.poNumber}
+                onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="poFile" className="text-sm font-semibold text-gray-700">Upload PO (Optional)</label>
+              <div className="flex items-center justify-center w-full">
+                <label
+                  htmlFor="poFile"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-2xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all"
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <span className="text-2xl mb-2">📄</span>
+                    <p className="mb-2 text-sm text-gray-500 font-medium">
+                      {formData.poFile ? formData.poFile.name : "Click to upload or drag and drop"}
+                    </p>
+                    <p className="text-xs text-gray-400">PDF, PNG or JPG (MAX. 5MB)</p>
+                  </div>
+                  <input
+                    id="poFile"
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null
+                      setFormData({ ...formData, poFile: file })
+                    }}
+                  />
+                </label>
               </div>
             </div>
 
