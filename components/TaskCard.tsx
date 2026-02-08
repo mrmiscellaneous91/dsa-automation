@@ -28,8 +28,10 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                 throw new Error(data.error || "Failed to log to sheets")
             }
             setStep(2)
+            return true
         } catch (err: any) {
             setError(err.message)
+            return false
         } finally {
             setLoading(false)
         }
@@ -54,8 +56,10 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                 throw new Error(data.error || "Automation failed")
             }
             setStep(3)
+            return true
         } catch (err: any) {
             setError(err.message)
+            return false
         } finally {
             setLoading(false)
         }
@@ -77,8 +81,10 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
             })
             if (!res.ok) throw new Error("Failed to send welcome email")
             setStep(4)
+            return true
         } catch (err: any) {
             setError(err.message)
+            return false
         } finally {
             setLoading(false)
         }
@@ -100,6 +106,76 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
             })
             if (!res.ok) throw new Error("Failed to send confirmation to provider")
             setStep(5)
+            return true
+        } catch (err: any) {
+            setError(err.message)
+            return false
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const runAllSteps = async () => {
+        setLoading(true)
+        setError("")
+
+        try {
+            // Step 1: Log to Sheets
+            const res1 = await fetch("/api/sheets/log", {
+                method: "POST",
+                body: JSON.stringify({ data: parsed }),
+            })
+            if (!res1.ok) {
+                const data = await res1.json()
+                throw new Error(`Step 1 Failed: ${data.error || "Failed to log to sheets"}`)
+            }
+            setStep(2)
+
+            // Step 2: Automation
+            const res2 = await fetch("/api/admin/automate", {
+                method: "POST",
+                body: JSON.stringify({
+                    userData: {
+                        email: parsed.userEmail,
+                        userName: parsed.userName,
+                        licenseYears: parsed.licenseYears
+                    }
+                }),
+            })
+            if (!res2.ok) {
+                const data = await res2.json()
+                throw new Error(`Step 2 Failed: ${data.error || "Automation failed"}`)
+            }
+            setStep(3)
+
+            // Step 3: Welcome Email
+            const firstName = parsed.userName.split(" ")[0]
+            const welcomeBody = WELCOME_EMAIL_TEMPLATE(firstName, parsed.userEmail, parsed.licenseYears, 'Audemic@123')
+            const res3 = await fetch("/api/gmail/send", {
+                method: "POST",
+                body: JSON.stringify({
+                    to: parsed.userEmail,
+                    subject: `${parsed.userName}: Audemic Scholar - DSA Licence`,
+                    body: welcomeBody,
+                }),
+            })
+            if (!res3.ok) throw new Error("Step 3 Failed: Failed to send welcome email")
+            setStep(4)
+
+            // Step 4: Provider Confirm
+            const confirmBody = CONFIRMATION_EMAIL_TEMPLATE(parsed.providerContact)
+            const res4 = await fetch("/api/gmail/send", {
+                method: "POST",
+                body: JSON.stringify({
+                    to: task.from,
+                    subject: `Re: ${task.subject}`,
+                    body: confirmBody,
+                    threadId: task.threadId,
+                }),
+            })
+            if (!res4.ok) throw new Error("Step 4 Failed: Failed to send confirmation to provider")
+            setStep(5)
+
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -127,6 +203,31 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100">
                         {error}
+                    </div>
+                )}
+
+                {step === 1 && (
+                    <div className="mb-6">
+                        <button
+                            onClick={runAllSteps}
+                            disabled={loading}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition-all hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processing Auto-Onboarding...
+                                </>
+                            ) : (
+                                <>
+                                    <span>⚡️</span>
+                                    Run All Steps (1-4)
+                                </>
+                            )}
+                        </button>
                     </div>
                 )}
 
@@ -205,7 +306,7 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                             </div>
                             <div>
                                 <p className="font-semibold text-gray-900">Confirm to Provider</p>
-                                <p className="text-xs text-gray-500">Reply to provider: "User issued"</p>
+                                <p className="text-xs text-gray-500">Reply to provider: &quot;User issued&quot;</p>
                             </div>
                         </div>
                         {step === 4 && (
