@@ -2,7 +2,7 @@ export const WELCOME_EMAIL_TEMPLATE = (name: string, email: string, years: numbe
 <div style="font-family: Arial, sans-serif; color: #333;">
   <p>Hi ${name},</p>
   <p>You now have ${years} year access to Audemic Scholar!</p>
-  <p>To log in, <a href="https://app.audemic.io">go here</a> and please use the credentials below. 
+  <p>To log in, <a href="https://www.audemic.app">www.audemic.app</a> and please use the credentials below. 
   Then change your password by heading to the profile section</p>
   
   <p style="background: #f4f4f4; padding: 10px; border-radius: 5px;">
