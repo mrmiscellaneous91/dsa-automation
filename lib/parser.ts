@@ -41,6 +41,9 @@ function extractPONumber(fullEmailBody: string, subject: string = ""): string {
         // Standalone Alphanumeric (e.g. IPO51565)
         /\b(IPO[0-9]{5,8})\b/i,
 
+        // Sight and Sound: "STPORD-108546"
+        /\b(STPORD-[0-9]{5,10})\b/i,
+
         // Barry Bennett PDF: "Order No. : 184451"
         /Order No\.\s*:\s*([0-9]{5,10})/i,
 
