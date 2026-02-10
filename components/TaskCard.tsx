@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { WELCOME_EMAIL_TEMPLATE, CONFIRMATION_EMAIL_TEMPLATE } from "@/lib/templates"
+import { WELCOME_EMAIL_TEMPLATE, CONFIRMATION_EMAIL_TEMPLATE, MISSING_INFO_EMAIL_TEMPLATE } from "@/lib/templates"
 
 interface TaskCardProps {
     task: any
@@ -12,8 +12,16 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [missingInfoSent, setMissingInfoSent] = useState(false)
 
     const parsed = task.parsedData
+
+    const missingFields: string[] = []
+    if (!parsed.userName || parsed.userName.includes("Not Found")) missingFields.push("Student Name")
+    if (!parsed.userEmail || !parsed.userEmail.includes("@")) missingFields.push("Student Email")
+    if (!parsed.poNumber || parsed.poNumber.includes("NOT FOUND")) missingFields.push("PO Number")
+
+    const hasMissingInfo = missingFields.length > 0
 
     const logToSheets = async () => {
         setLoading(true)
@@ -115,6 +123,31 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
         }
     }
 
+    const requestMissingInfo = async () => {
+        setLoading(true)
+        setError("")
+        try {
+            const body = MISSING_INFO_EMAIL_TEMPLATE(parsed.providerContact, missingFields)
+            const res = await fetch("/api/gmail/send", {
+                method: "POST",
+                body: JSON.stringify({
+                    to: task.from,
+                    subject: `Re: ${task.subject} - Missing Information`,
+                    body,
+                    threadId: task.threadId,
+                }),
+            })
+            if (!res.ok) throw new Error("Failed to send request for missing info")
+            setMissingInfoSent(true)
+            return true
+        } catch (err: any) {
+            setError(err.message)
+            return false
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const runAllSteps = async () => {
         setLoading(true)
         setError("")
@@ -206,11 +239,36 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
                     </div>
                 )}
 
+                {hasMissingInfo && (
+                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                        <div className="flex items-center gap-2 text-amber-800 font-bold mb-2">
+                            <span>⚠️</span>
+                            <span>Missing Information Detected</span>
+                        </div>
+                        <p className="text-sm text-amber-700 mb-4">
+                            The following details could not be found: <strong>{missingFields.join(", ")}</strong>
+                        </p>
+                        {!missingInfoSent ? (
+                            <button
+                                onClick={requestMissingInfo}
+                                disabled={loading}
+                                className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+                            >
+                                {loading ? "Sending Request..." : "Request Missing Info from Supplier"}
+                            </button>
+                        ) : (
+                            <div className="text-center py-2 bg-green-100 text-green-700 rounded-lg font-bold text-sm">
+                                ✓ Request sent to supplier
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {step === 1 && (
                     <div className="mb-6">
                         <button
                             onClick={runAllSteps}
-                            disabled={loading}
+                            disabled={loading || hasMissingInfo}
                             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition-all hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? (

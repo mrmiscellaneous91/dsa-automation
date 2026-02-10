@@ -37,3 +37,21 @@ export const CONFIRMATION_EMAIL_TEMPLATE = (contactName: string) => `
   joshua@audemic.io</p>
 </div>
 `
+
+export const MISSING_INFO_EMAIL_TEMPLATE = (contactName: string, missingFields: string[]) => `
+<div style="font-family: Arial, sans-serif; color: #333;">
+  <p>Hi ${contactName},</p>
+  <p>Thank you for the request. However, it appears some student information is missing from your email:</p>
+  <ul>
+    ${missingFields.map(field => `<li><strong>${field}</strong></li>`).join('')}
+  </ul>
+  <p>Could you please provide these details so we can process the license for you?</p>
+  <p>Best regards,<br>
+  --<br>
+  <strong>Joshua Mitcham</strong><br>
+  CEO & Co-Founder<br>
+  Audemic<br>
+  joshua@audemic.io</p>
+</div>
+`
+
