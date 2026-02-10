@@ -118,7 +118,7 @@ Structured data → Audemic API (Production) → Create user (✅) → Create su
 
 1. **Dashboard** - View all pending DSA requests at https://dsa-automation-three.vercel.app
 2. **Email Parsing** - Correctly extracts student name, email, PO number, license years
-3. **Provider Detection** - Identifies Remtek, Invate, Barry Bennett, Assistive
+3. **Provider Detection** - Identifies Remtek, Invate, Barry Bennett, Sight and Sound, Assistive
 4. **Name Extraction** - Fixed to handle all email formats
 
 ---

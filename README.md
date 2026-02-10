@@ -44,8 +44,9 @@ When a DSA provider (like Remtek, Invate, or Barry Bennett) emails Audemic with 
 |----------|--------------|--------|
 | Remtek | remtek.co.uk | ✅ Working |
 | Invate | invate.co.uk | ✅ Working |
-| Barry Bennett | barrybennet-group.co.uk | ✅ Working |
-| Assistive | sightandsoundtech.co.uk | ✅ Working |
+| Barry Bennett | barrybennett.co.uk | ✅ Working |
+| Sight and Sound | sightandsound.co.uk | ✅ Working |
+| Assistive | as-dsa.com | ✅ Working |
 
 ---
 

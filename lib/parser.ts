@@ -8,7 +8,7 @@ const anthropic = new Anthropic({
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy")
 
 export interface ParsedRequest {
-    provider: "Remtek" | "Invate" | "Assistive" | "Barry Bennett" | "Unknown"
+    provider: "Remtek" | "Invate" | "Assistive" | "Barry Bennett" | "Sight and Sound" | "Unknown"
     providerContact: string
     userName: string
     firstName?: string
@@ -176,6 +176,7 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     else if (senderLower.includes("remtek-online.co.uk")) identifiedProvider = "Remtek"
     else if (senderLower.includes("invate.co.uk")) identifiedProvider = "Invate"
     else if (senderLower.includes("as-dsa.com") || senderLower.includes("unleashedsoftware.com")) identifiedProvider = "Assistive"
+    else if (senderLower.includes("sightandsound.co.uk")) identifiedProvider = "Sight and Sound"
 
     const prompt = `Extract DSA student info from this email. 
     Separate the body from the [PDF ATTACHMENT CONTENT]. 
