@@ -70,15 +70,19 @@ function extractPONumber(fullEmailBody: string, subject: string = ""): string {
 /**
  * Extracts license years from email body
  */
-function extractLicenseYears(body: string): number {
+function extractLicenseYears(body: string): number | null {
     const text = body.toLowerCase()
 
-    if (text.includes("4 year") || text.includes("four year")) return 4
-    if (text.includes("3 year") || text.includes("three year")) return 3
-    if (text.includes("2 year") || text.includes("two year")) return 2
+    // Match patterns like "3 year", "3-year", "3 years", "3year"
+    const digitMatch = text.match(/\b([234])[- ]?years?\b/i)
+    if (digitMatch) return parseInt(digitMatch[1])
 
-    // Default to 1
-    return 1
+    // Match word patterns like "three year", "three-year", "three years"
+    if (/\bfour[- ]?years?\b/i.test(text)) return 4
+    if (/\bthree[- ]?years?\b/i.test(text)) return 3
+    if (/\btwo[- ]?years?\b/i.test(text)) return 2
+
+    return null
 }
 
 /**
@@ -239,8 +243,11 @@ export async function parseEmailWithAI(emailBody: string, subject: string, sende
     // Final cleanups
     parsed.provider = identifiedProvider
 
-    // Use robust license years extraction to override or confirm AI result
-    parsed.licenseYears = extractLicenseYears(emailBody)
+    // Use robust license years extraction to confirm or override AI result
+    const regexYears = extractLicenseYears(emailBody)
+    if (regexYears) {
+        parsed.licenseYears = regexYears
+    }
 
     const parts = parsed.userName.split(' ')
     parsed.firstName = parts[0]
